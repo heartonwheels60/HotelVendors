@@ -1,58 +1,148 @@
-import React, { useState } from 'react';
-import { amenityGroups } from '../../data/amenities';
-import { AmenityCategory } from './AmenityCategory';
-import { CustomAmenityInput } from './CustomAmenityInput';
-import { AmenityPreview } from './AmenityPreview';
-import type { Amenity } from '../../types/amenity';
+import React from 'react';
+import { Button } from '../ui/Button';
 
-export const AmenityManager: React.FC = () => {
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-  const [customAmenities, setCustomAmenities] = useState<Amenity[]>([]);
+interface AmenityManagerProps {
+  selectedAmenities: string[];
+  onChange: (amenities: string[]) => void;
+}
 
-  const handleToggle = (amenityId: string) => {
-    setSelectedAmenities(prev =>
-      prev.includes(amenityId)
-        ? prev.filter(id => id !== amenityId)
-        : [...prev, amenityId]
-    );
-  };
+const AMENITY_CATEGORIES = [
+  {
+    name: 'Basic Amenities',
+    amenities: [
+      { id: 'wifi', name: 'WiFi' },
+      { id: 'parking', name: 'Parking' },
+      { id: 'airConditioning', name: 'Air Conditioning' },
+      { id: 'heating', name: 'Heating' },
+      { id: 'elevator', name: 'Elevator' },
+      { id: '24hrFrontDesk', name: '24/7 Front Desk' },
+      { id: 'security', name: '24/7 Security' },
+      { id: 'smokeFree', name: 'Smoke-Free Property' },
+    ]
+  },
+  {
+    name: 'Health & Medical',
+    amenities: [
+      { id: 'firstAid', name: 'First Aid Station' },
+      { id: 'doctorOnCall', name: 'Doctor On Call' },
+      { id: 'pharmacy', name: 'Pharmacy Service' },
+      { id: 'ambulanceAccess', name: 'Ambulance Access' },
+      { id: 'medicalCenter', name: 'Medical Center' },
+      { id: 'nurseOnDuty', name: 'Nurse On Duty' },
+      { id: 'defibrillator', name: 'AED Defibrillator' },
+      { id: 'oxygenService', name: 'Oxygen Service' },
+      { id: 'wheelchairRental', name: 'Wheelchair Rental' },
+      { id: 'medicalEquipment', name: 'Medical Equipment' },
+      { id: 'isolationRoom', name: 'Isolation Room' },
+      { id: 'healthScreening', name: 'Health Screening' }
+    ]
+  },
+  {
+    name: 'Room Features',
+    amenities: [
+      { id: 'tv', name: 'TV' },
+      { id: 'minibar', name: 'Minibar' },
+      { id: 'safe', name: 'In-Room Safe' },
+      { id: 'workDesk', name: 'Work Desk' },
+      { id: 'coffeemaker', name: 'Coffee Maker' },
+      { id: 'hairDryer', name: 'Hair Dryer' },
+      { id: 'ironingFacilities', name: 'Iron & Board' },
+      { id: 'bathtub', name: 'Bathtub' },
+      { id: 'shower', name: 'Shower' },
+      { id: 'toiletries', name: 'Toiletries' },
+      { id: 'bathrobes', name: 'Bathrobes' },
+      { id: 'roomService', name: 'Room Service' },
+    ]
+  },
+  {
+    name: 'Food & Beverage',
+    amenities: [
+      { id: 'restaurant', name: 'Restaurant' },
+      { id: 'bar', name: 'Bar/Lounge' },
+      { id: 'breakfast', name: 'Breakfast Available' },
+      { id: 'cafe', name: 'Café' },
+      { id: 'minimarket', name: 'Mini-Market' },
+      { id: 'waterDispenser', name: 'Water Dispenser' },
+    ]
+  },
+  {
+    name: 'Recreation & Wellness',
+    amenities: [
+      { id: 'swimmingPool', name: 'Swimming Pool' },
+      { id: 'gym', name: 'Fitness Center' },
+      { id: 'spa', name: 'Spa' },
+      { id: 'sauna', name: 'Sauna' },
+      { id: 'jacuzzi', name: 'Jacuzzi' },
+      { id: 'garden', name: 'Garden' },
+      { id: 'terrace', name: 'Terrace' },
+      { id: 'playground', name: 'Kids Playground' },
+      { id: 'gameRoom', name: 'Game Room' },
+    ]
+  },
+  {
+    name: 'Business Services',
+    amenities: [
+      { id: 'businessCenter', name: 'Business Center' },
+      { id: 'meetingRooms', name: 'Meeting Rooms' },
+      { id: 'conferenceRoom', name: 'Conference Facilities' },
+      { id: 'faxCopy', name: 'Fax/Copy Service' },
+      { id: 'computerStation', name: 'Computer Station' },
+    ]
+  },
+  {
+    name: 'Services',
+    amenities: [
+      { id: 'laundry', name: 'Laundry Service' },
+      { id: 'dryClean', name: 'Dry Cleaning' },
+      { id: 'concierge', name: 'Concierge Service' },
+      { id: 'luggageStorage', name: 'Luggage Storage' },
+      { id: 'currencyExchange', name: 'Currency Exchange' },
+      { id: 'tourDesk', name: 'Tour Desk' },
+      { id: 'carRental', name: 'Car Rental' },
+      { id: 'airportTransfer', name: 'Airport Transfer' },
+      { id: 'babysitting', name: 'Babysitting Service' },
+    ]
+  },
+  {
+    name: 'Accessibility',
+    amenities: [
+      { id: 'wheelchair', name: 'Wheelchair Accessible' },
+      { id: 'braille', name: 'Braille Signage' },
+      { id: 'handicapParking', name: 'Handicap Parking' },
+      { id: 'accessibleBathroom', name: 'Accessible Bathroom' },
+    ]
+  }
+];
 
-  const handleAddCustom = (name: string) => {
-    const newAmenity: Amenity = {
-      id: `custom-${Date.now()}`,
-      name,
-      category: 'other',
-      isCustom: true
-    };
-    setCustomAmenities(prev => [...prev, newAmenity]);
-    setSelectedAmenities(prev => [...prev, newAmenity.id]);
+export const AmenityManager: React.FC<AmenityManagerProps> = ({ selectedAmenities, onChange }) => {
+  const handleToggleAmenity = (amenityId: string) => {
+    if (selectedAmenities.includes(amenityId)) {
+      onChange(selectedAmenities.filter(id => id !== amenityId));
+    } else {
+      onChange([...selectedAmenities, amenityId]);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-6">Property Amenities</h2>
-        
-        {amenityGroups.map(group => (
-          <AmenityCategory
-            key={group.category}
-            group={group}
-            selectedAmenities={selectedAmenities}
-            onToggle={handleToggle}
-          />
-        ))}
-
-        <div className="mt-6">
-          <h3 className="text-lg font-medium mb-4">Custom Amenities</h3>
-          <CustomAmenityInput onAdd={handleAddCustom} />
+    <div className="space-y-8">
+      {AMENITY_CATEGORIES.map(category => (
+        <div key={category.name} className="space-y-4">
+          <h4 className="text-lg font-medium text-gray-900">{category.name}</h4>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {category.amenities.map(amenity => (
+              <Button
+                key={amenity.id}
+                type="button"
+                variant={selectedAmenities.includes(amenity.id) ? 'primary' : 'secondary'}
+                onClick={() => handleToggleAmenity(amenity.id)}
+                className="justify-start"
+              >
+                {amenity.name}
+              </Button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      <AmenityPreview
-        selectedIds={selectedAmenities}
-        amenityGroups={amenityGroups}
-        customAmenities={customAmenities}
-      />
+      ))}
     </div>
   );
 };

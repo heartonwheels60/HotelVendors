@@ -7,13 +7,18 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
+import { PropertiesPage } from './pages/PropertiesPage';
+import { PropertyFormPage } from './pages/PropertyFormPage';
+import { BookingsPage } from './pages/BookingsPage';
+import { BookingFormPage } from './pages/BookingFormPage';
+import { BookingCalendarPage } from './pages/BookingCalendarPage';
+import { ReviewsPage } from './pages/ReviewsPage';
+import { ReviewFormPage } from './pages/ReviewFormPage';
 
 // Lazy load components
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const PropertiesPage = React.lazy(() => import('./pages/PropertiesPage').then(module => ({ default: module.PropertiesPage })));
-const PropertyFormPage = React.lazy(() => import('./pages/PropertyFormPage').then(module => ({ default: module.PropertyFormPage })));
-const RoomManagement = React.lazy(() => import('./pages/RoomManagement').then(module => ({ default: module.RoomManagement })));
-const NotFound = React.lazy(() => import('./pages/NotFound').then(module => ({ default: module.NotFound })));
+const RoomManagement = React.lazy(() => import('./pages/RoomManagement'));
+const NotFound = React.lazy(() => import('./pages/NotFound'));
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -27,72 +32,43 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Router>
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              {/* Auth Routes */}
-              <Route path="/auth/login" element={<LoginPage />} />
-              <Route path="/auth/register" element={<RegisterPage />} />
-              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/auth/login" element={<LoginPage />} />
+            <Route path="/auth/register" element={<RegisterPage />} />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
-              {/* Protected Routes */}
-              <Route 
-                path="/" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <Dashboard />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/properties" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <PropertiesPage />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/properties/new" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <PropertyFormPage />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/properties/:id/edit" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <PropertyFormPage />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/rooms" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <RoomManagement />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              
-              {/* Redirect root to login if not authenticated */}
-              <Route path="/" element={<Navigate to="/auth/login" replace />} />
-              
-              {/* Not Found */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+            {/* Protected Routes with Layout */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <Dashboard />
+                  </Suspense>
+                } />
+                <Route path="/properties" element={<PropertiesPage />} />
+                <Route path="/properties/new" element={<PropertyFormPage />} />
+                <Route path="/properties/edit/:id" element={<PropertyFormPage />} />
+                <Route path="/rooms" element={
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <RoomManagement />
+                  </Suspense>
+                } />
+                <Route path="/bookings" element={<BookingsPage />} />
+                <Route path="/bookings/new" element={<BookingFormPage />} />
+                <Route path="/bookings/edit/:id" element={<BookingFormPage />} />
+                <Route path="/bookings/calendar" element={<BookingCalendarPage />} />
+                <Route path="/reviews" element={<ReviewsPage />} />
+                <Route path="/reviews/new/:bookingId" element={<ReviewFormPage />} />
+                {/* Catch-all route for 404 */}
+                <Route path="*" element={
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <NotFound />
+                  </Suspense>
+                } />
+              </Route>
+            </Route>
+          </Routes>
         </Router>
       </AuthProvider>
     </ErrorBoundary>

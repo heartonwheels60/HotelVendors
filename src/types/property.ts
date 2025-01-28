@@ -1,10 +1,8 @@
-export type RoomType = 'standard' | 'deluxe' | 'suite';
+export type RoomTypeName = 'Standard Room' | 'Deluxe Room' | 'Suite';
 
-export interface RoomPrice {
-  type: RoomType;
-  pricePerNight: number;
-  capacity: number;
-  amenities: string[];
+export interface RoomType {
+  name: RoomTypeName;
+  price: number;
 }
 
 export interface Property {
@@ -13,10 +11,16 @@ export interface Property {
   description: string;
   address: string;
   images: string[];
-  roomTypes: RoomPrice[];
+  roomTypes: RoomType[];
+  amenities: string[];
   status: 'active' | 'inactive' | 'maintenance';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-export type PropertyFormData = Omit<Property, 'id' | 'createdAt' | 'updatedAt'>;
+export interface PropertyFormData extends Omit<Property, 'id' | 'createdAt' | 'updatedAt'> {
+  roomTypes: Array<{
+    name: RoomTypeName;
+    price: number;
+  }>;
+}
