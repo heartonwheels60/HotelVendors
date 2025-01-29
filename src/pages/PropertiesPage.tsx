@@ -112,41 +112,41 @@ const PropertyCard = React.memo(({
   );
 });
 
-export const PropertiesPage: React.FC = () => {
+export const HotelsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [properties, setProperties] = useState<Property[]>([]);
+  const [hotels, setHotels] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadProperties = useCallback(async () => {
+  const loadHotels = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await propertyService.getProperties();
-      setProperties(data);
+      setHotels(data);
       setError(null);
     } catch (err) {
-      console.error('Error loading properties:', err);
-      setError('Failed to load properties');
+      console.error('Error loading hotels:', err);
+      setError('Failed to load hotels');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadProperties();
-  }, [loadProperties]);
+    loadHotels();
+  }, [loadHotels]);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this property?')) {
+    if (!window.confirm('Are you sure you want to delete this hotel?')) {
       return;
     }
 
     try {
       await propertyService.deleteProperty(id);
-      await loadProperties(); // Reload the list
+      await loadHotels(); // Reload the list
     } catch (err) {
-      console.error('Error deleting property:', err);
-      setError('Failed to delete property');
+      console.error('Error deleting hotel:', err);
+      setError('Failed to delete hotel');
     }
   };
 
@@ -172,30 +172,30 @@ export const PropertiesPage: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Properties</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Hotels</h1>
         <Link
-          to="/properties/new"
+          to="/hotels/new"
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
         >
           <Plus className="h-5 w-5 mr-2" />
-          Add Property
+          Add Hotel
         </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {properties.map((property) => (
+        {hotels.map((hotel) => (
           <PropertyCard
-            key={property.id}
-            property={property}
-            onEdit={(id) => navigate(`/properties/edit/${id}`)}
+            key={hotel.id}
+            property={hotel}
+            onEdit={(id) => navigate(`/hotels/edit/${id}`)}
             onDelete={handleDelete}
           />
         ))}
       </div>
 
-      {properties.length === 0 && (
+      {hotels.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-500">No properties found. Add your first property!</p>
+          <p className="text-gray-500">No hotels found. Add your first hotel!</p>
         </div>
       )}
     </div>

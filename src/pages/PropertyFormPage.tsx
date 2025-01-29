@@ -13,7 +13,7 @@ const ROOM_TYPES = [
   { value: 'deluxe', label: 'Deluxe Room' }
 ] as const;
 
-export const PropertyFormPage: React.FC = () => {
+export const HotelFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -78,7 +78,7 @@ export const PropertyFormPage: React.FC = () => {
       } else {
         await propertyService.createProperty(formData);
       }
-      navigate('/properties');
+      navigate('/hotels');
     } catch (err) {
       console.error('Error saving property:', err);
       setError('Failed to save property');
@@ -113,7 +113,7 @@ export const PropertyFormPage: React.FC = () => {
     <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">
-          {id ? 'Edit Property' : 'Add New Property'}
+          {id ? 'Edit Hotel' : 'Add New Hotel'}
         </h1>
       </div>
 
@@ -131,7 +131,7 @@ export const PropertyFormPage: React.FC = () => {
           <div className="space-y-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Property Name
+                Hotel Name
               </label>
               <input
                 type="text"
@@ -175,12 +175,12 @@ export const PropertyFormPage: React.FC = () => {
 
         {/* Images */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">Property Images</label>
+          <label className="block text-sm font-medium text-gray-700">Hotel Images</label>
           <ImageUploader
             images={formData.images}
             onImagesChange={(newImages) => setFormData(prev => ({ ...prev, images: newImages }))}
             maxImages={5}
-            folder={`properties/${formData.name.toLowerCase().replace(/\s+/g, '-')}`}
+            folder={`hotels/${formData.name.toLowerCase().replace(/\s+/g, '-')}`}
           />
         </div>
 
@@ -273,9 +273,9 @@ export const PropertyFormPage: React.FC = () => {
 
         {/* Amenities */}
         <div className="bg-white shadow-sm rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Property Amenities</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Hotel Amenities</h2>
           <p className="text-sm text-gray-600 mb-4">
-            Select all amenities available at this property. These will be displayed to potential guests.
+            Select all amenities available at this hotel. These will be displayed to potential guests.
           </p>
           <AmenityManager
             selectedAmenities={formData.amenities}
@@ -287,7 +287,7 @@ export const PropertyFormPage: React.FC = () => {
         <div className="flex justify-end space-x-3">
           <button
             type="button"
-            onClick={() => navigate('/properties')}
+            onClick={() => navigate('/hotels')}
             className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             Cancel
@@ -297,7 +297,7 @@ export const PropertyFormPage: React.FC = () => {
             disabled={isLoading}
             className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
-            {isLoading ? 'Saving...' : 'Save Property'}
+            {isLoading ? 'Saving...' : 'Save Hotel'}
           </button>
         </div>
       </form>

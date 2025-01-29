@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const menuItems = [
   { path: '/', icon: <LayoutGrid className="w-6 h-6" />, label: 'Dashboard' },
-  { path: '/properties', icon: <Building2 className="w-6 h-6" />, label: 'Properties' },
+  { path: '/hotels', icon: <Building2 className="w-6 h-6" />, label: 'Hotels' },
   { path: '/bookings', icon: <CalendarDays className="w-6 h-6" />, label: 'Bookings' },
   { path: '/pricing', icon: <DollarSign className="w-6 h-6" />, label: 'Pricing' },
   { path: '/reviews', icon: <MessageSquare className="w-6 h-6" />, label: 'Reviews' },

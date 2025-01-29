@@ -7,8 +7,8 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
-import { PropertiesPage } from './pages/PropertiesPage';
-import { PropertyFormPage } from './pages/PropertyFormPage';
+import { HotelsPage } from './pages/PropertiesPage';
+import { HotelFormPage } from './pages/PropertyFormPage';
 import { BookingsPage } from './pages/BookingsPage';
 import { BookingFormPage } from './pages/BookingFormPage';
 import { BookingCalendarPage } from './pages/BookingCalendarPage';
@@ -47,9 +47,9 @@ function App() {
                     <Dashboard />
                   </Suspense>
                 } />
-                <Route path="/properties" element={<PropertiesPage />} />
-                <Route path="/properties/new" element={<PropertyFormPage />} />
-                <Route path="/properties/edit/:id" element={<PropertyFormPage />} />
+                <Route path="/hotels" element={<HotelsPage />} />
+                <Route path="/hotels/new" element={<HotelFormPage />} />
+                <Route path="/hotels/edit/:id" element={<HotelFormPage />} />
                 <Route path="/rooms" element={
                   <Suspense fallback={<LoadingSpinner />}>
                     <RoomManagement />

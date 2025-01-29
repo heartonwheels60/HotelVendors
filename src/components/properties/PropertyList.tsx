@@ -11,7 +11,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({ properties }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Properties</h2>
+        <h2 className="text-2xl font-semibold">Hotels</h2>
         <Link
           to="/properties/new"
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
