@@ -3,6 +3,7 @@ export type RoomTypeName = 'Standard Room' | 'Deluxe Room' | 'Suite';
 export interface RoomType {
   name: RoomTypeName;
   price: number;
+  numberOfRooms: number;
 }
 
 export interface Property {
@@ -13,7 +14,7 @@ export interface Property {
   images: string[];
   roomTypes: RoomType[];
   amenities: string[];
-  status: 'active' | 'inactive' | 'maintenance';
+  status: 'active' | 'booked' | 'inactive' | 'maintenance';
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -22,5 +23,6 @@ export interface PropertyFormData extends Omit<Property, 'id' | 'createdAt' | 'u
   roomTypes: Array<{
     name: RoomTypeName;
     price: number;
+    numberOfRooms: number;
   }>;
 }

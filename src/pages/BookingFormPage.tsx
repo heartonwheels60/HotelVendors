@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 import { bookingService } from '../services/bookingService';
 import { propertyService } from '../services/propertyService';
-import type { BookingFormData } from '../types/booking';
+import type { BookingFormData, BookingStatus } from '../types/booking';
 import type { Property } from '../types/property';
 import { format, isBefore, startOfDay } from 'date-fns';
 
@@ -103,15 +103,31 @@ export const BookingFormPage: React.FC = () => {
     
     try {
       setIsLoading(true);
+      setError(null);
+
       if (id) {
-        await bookingService.updateBooking(id, formData);
+        // For updates, only send the changed fields
+        const updates: Partial<BookingFormData> = {
+          checkIn: formData.checkIn,
+          checkOut: formData.checkOut,
+          numberOfGuests: formData.numberOfGuests,
+          guestName: formData.guestName,
+          guestEmail: formData.guestEmail,
+          guestPhone: formData.guestPhone,
+          notes: formData.notes
+        };
+        await bookingService.updateBooking(id, updates);
       } else {
         await bookingService.createBooking(formData);
       }
       navigate('/bookings');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving booking:', err);
-      setError('Failed to save booking');
+      if (err.message === 'Rooms Filled') {
+        setError('Rooms Filled');
+      } else {
+        setError('Failed to save booking');
+      }
       setIsLoading(false);
     }
   };
@@ -126,6 +142,20 @@ export const BookingFormPage: React.FC = () => {
         roomType: property.roomTypes[0]?.name || '',
         totalAmount: property.roomTypes[0]?.price || 0
       }));
+    }
+  };
+
+  const updateBookingStatus = async (newStatus: BookingStatus) => {
+    if (!id) return;
+    
+    try {
+      setIsLoading(true);
+      await bookingService.updateBooking(id, { status: newStatus });
+      navigate('/bookings');
+    } catch (err) {
+      console.error('Error updating booking status:', err);
+      setError('Failed to update booking status');
+      setIsLoading(false);
     }
   };
 
@@ -159,6 +189,7 @@ export const BookingFormPage: React.FC = () => {
             onChange={(e) => handlePropertyChange(e.target.value)}
             className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             required
+            disabled={id !== undefined}
           >
             <option value="">Select a property</option>
             {properties.map(property => (
@@ -174,9 +205,18 @@ export const BookingFormPage: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700">Room Type</label>
           <select
             value={formData.roomType}
-            onChange={(e) => setFormData(prev => ({ ...prev, roomType: e.target.value }))}
+            onChange={(e) => {
+              const property = properties.find(p => p.id === formData.propertyId);
+              const roomType = property?.roomTypes.find(rt => rt.name === e.target.value);
+              setFormData(prev => ({ 
+                ...prev, 
+                roomType: e.target.value,
+                totalAmount: roomType?.price || prev.totalAmount
+              }));
+            }}
             className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             required
+            disabled={id !== undefined}
           >
             <option value="">Select a room type</option>
             {properties
@@ -235,17 +275,9 @@ export const BookingFormPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700">Check-in Date</label>
               <input
                 type="date"
-                min={todayStr}
                 value={format(formData.checkIn, 'yyyy-MM-dd')}
-                onChange={(e) => {
-                  const newCheckIn = new Date(e.target.value);
-                  setFormData(prev => ({
-                    ...prev,
-                    checkIn: newCheckIn,
-                    // If check-out is before new check-in, update it
-                    checkOut: isBefore(prev.checkOut, newCheckIn) ? newCheckIn : prev.checkOut
-                  }));
-                }}
+                min={todayStr}
+                onChange={(e) => setFormData(prev => ({ ...prev, checkIn: new Date(e.target.value) }))}
                 className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
               />
@@ -255,12 +287,9 @@ export const BookingFormPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700">Check-out Date</label>
               <input
                 type="date"
-                min={format(formData.checkIn, 'yyyy-MM-dd')}
                 value={format(formData.checkOut, 'yyyy-MM-dd')}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  checkOut: new Date(e.target.value)
-                }))}
+                min={format(formData.checkIn, 'yyyy-MM-dd')}
+                onChange={(e) => setFormData(prev => ({ ...prev, checkOut: new Date(e.target.value) }))}
                 className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
               />
@@ -273,38 +302,10 @@ export const BookingFormPage: React.FC = () => {
               type="number"
               min="1"
               value={formData.numberOfGuests}
-              onChange={(e) => setFormData(prev => ({ ...prev, numberOfGuests: parseInt(e.target.value) }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, numberOfGuests: parseInt(e.target.value) || 1 }))}
               className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               required
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Total Amount</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.totalAmount}
-              onChange={(e) => setFormData(prev => ({ ...prev, totalAmount: parseFloat(e.target.value) }))}
-              className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as BookingFormData['status'] }))}
-              className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              required
-            >
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="completed">Completed</option>
-            </select>
           </div>
 
           <div>
@@ -318,19 +319,54 @@ export const BookingFormPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Status Buttons for Confirmed Bookings */}
+        {id && formData.status === 'confirmed' && (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-900 mb-4">Booking Actions</h3>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => updateBookingStatus('checkedIn')}
+                className="px-4 py-2 border border-green-300 rounded-md shadow-sm text-sm font-medium text-green-700 bg-white hover:bg-green-50"
+              >
+                Check In
+              </button>
+              <button
+                type="button"
+                onClick={() => updateBookingStatus('noShow')}
+                className="px-4 py-2 border border-yellow-300 rounded-md shadow-sm text-sm font-medium text-yellow-700 bg-white hover:bg-yellow-50"
+              >
+                Mark as No-Show
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to cancel this booking?')) {
+                    updateBookingStatus('cancelled');
+                  }
+                }}
+                className="px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50"
+              >
+                Cancel Booking
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Form Actions */}
         <div className="flex justify-end space-x-3">
           <button
             type="button"
             onClick={() => navigate('/bookings')}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
           >
-            Cancel
+            Back
           </button>
+
           <button
             type="submit"
             disabled={isLoading}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             {isLoading ? 'Saving...' : id ? 'Update Booking' : 'Create Booking'}
           </button>

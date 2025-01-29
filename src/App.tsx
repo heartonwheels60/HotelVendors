@@ -14,11 +14,12 @@ import { BookingFormPage } from './pages/BookingFormPage';
 import { BookingCalendarPage } from './pages/BookingCalendarPage';
 import { ReviewsPage } from './pages/ReviewsPage';
 import { ReviewFormPage } from './pages/ReviewFormPage';
-
-// Lazy load components
-const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const RoomManagement = React.lazy(() => import('./pages/RoomManagement'));
-const NotFound = React.lazy(() => import('./pages/NotFound'));
+import { StaffPage } from './pages/StaffPage';
+import { StaffFormPage } from './pages/StaffFormPage';
+import { StaffSchedulePage } from './pages/StaffSchedulePage';
+import Dashboard from './pages/Dashboard';
+import RoomManagement from './pages/RoomManagement';
+import NotFound from './pages/NotFound';
 
 // Loading component
 const LoadingSpinner: React.FC = () => (
@@ -60,6 +61,10 @@ function App() {
                 <Route path="/bookings/calendar" element={<BookingCalendarPage />} />
                 <Route path="/reviews" element={<ReviewsPage />} />
                 <Route path="/reviews/new/:bookingId" element={<ReviewFormPage />} />
+                <Route path="/staff" element={<StaffPage />} />
+                <Route path="/staff/new" element={<StaffFormPage />} />
+                <Route path="/staff/edit/:id" element={<StaffFormPage />} />
+                <Route path="/staff/schedule" element={<StaffSchedulePage />} />
                 {/* Catch-all route for 404 */}
                 <Route path="*" element={
                   <Suspense fallback={<LoadingSpinner />}>

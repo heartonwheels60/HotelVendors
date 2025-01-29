@@ -21,7 +21,8 @@ const COLLECTION_NAME = 'properties';
 const convertRoomData = (room: DocumentData): RoomType => {
   return {
     name: room.name || 'Standard Room',
-    price: typeof room.price === 'number' ? room.price : 0
+    price: typeof room.price === 'number' ? room.price : 0,
+    numberOfRooms: typeof room.numberOfRooms === 'number' ? room.numberOfRooms : 1
   };
 };
 
@@ -48,13 +49,10 @@ export const propertyService = {
     try {
       const q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.docs.map(doc => 
-        convertPropertyData(doc.data(), doc.id)
-      );
+      return querySnapshot.docs.map(doc => convertPropertyData(doc.data(), doc.id));
     } catch (error) {
       console.error('Error getting properties:', error);
-      throw new Error('Failed to load properties');
+      throw error;
     }
   },
 
@@ -70,85 +68,60 @@ export const propertyService = {
       return convertPropertyData(docSnap.data(), docSnap.id);
     } catch (error) {
       console.error('Error getting property:', error);
-      throw new Error('Failed to load property');
+      throw error;
     }
   },
 
   async createProperty(data: PropertyFormData): Promise<Property[]> {
     try {
-      const batch = writeBatch(db);
-      const properties: Property[] = [];
+      const propertyData = {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        roomTypes: data.roomTypes.map(room => ({
+          name: room.name,
+          price: room.price,
+          numberOfRooms: room.numberOfRooms
+        }))
+      };
 
-      // Create a separate property for each room type
-      for (const roomType of data.roomTypes) {
-        const propertyData = {
-          name: `${data.name} - ${roomType.name}`,
-          description: data.description || '',
-          address: data.address || '',
-          images: Array.isArray(data.images) ? data.images : [],
-          roomTypes: [{
-            name: roomType.name,
-            price: Number(roomType.price) || 0
-          }],
-          amenities: Array.isArray(data.amenities) ? data.amenities : [],
-          status: data.status || 'active',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        };
-
-        const docRef = doc(collection(db, COLLECTION_NAME));
-        batch.set(docRef, propertyData);
-
-        properties.push({
-          id: docRef.id,
-          ...propertyData,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          roomTypes: propertyData.roomTypes
-        });
-      }
-
-      await batch.commit();
-      return properties;
+      const docRef = await addDoc(collection(db, COLLECTION_NAME), propertyData);
+      
+      // Return updated list of properties
+      return this.getProperties();
     } catch (error) {
       console.error('Error creating property:', error);
-      throw new Error('Failed to create property');
+      throw error;
     }
   },
 
   async updateProperty(id: string, data: PropertyFormData): Promise<void> {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const propertyRef = doc(db, COLLECTION_NAME, id);
       
-      // Ensure data is properly formatted before saving
-      const propertyData = {
-        name: data.name || '',
-        description: data.description || '',
-        address: data.address || '',
-        images: Array.isArray(data.images) ? data.images : [],
+      const updateData = {
+        ...data,
+        updatedAt: serverTimestamp(),
         roomTypes: data.roomTypes.map(room => ({
           name: room.name,
-          price: Number(room.price) || 0
-        })),
-        amenities: Array.isArray(data.amenities) ? data.amenities : [],
-        status: data.status || 'active',
-        updatedAt: serverTimestamp()
+          price: room.price,
+          numberOfRooms: room.numberOfRooms
+        }))
       };
 
-      await updateDoc(docRef, propertyData);
+      await updateDoc(propertyRef, updateData);
     } catch (error) {
       console.error('Error updating property:', error);
-      throw new Error('Failed to update property');
+      throw error;
     }
   },
 
   async deleteProperty(id: string): Promise<void> {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
-      await deleteDoc(docRef);
+      await deleteDoc(doc(db, COLLECTION_NAME, id));
     } catch (error) {
       console.error('Error deleting property:', error);
-      throw new Error('Failed to delete property');
+      throw error;
     }
   }
 };

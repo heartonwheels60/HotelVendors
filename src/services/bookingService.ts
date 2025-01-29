@@ -15,6 +15,7 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import type { Booking, BookingFormData, Guest } from '../types/booking';
+import { propertyService } from './propertyService';
 
 const BOOKINGS_COLLECTION = 'bookings';
 const GUESTS_COLLECTION = 'guests';
@@ -45,6 +46,58 @@ const convertBookingData = (docData: DocumentData, id: string): Booking => {
     createdAt: convertTimestamp(docData.createdAt),
     updatedAt: convertTimestamp(docData.updatedAt)
   };
+};
+
+// Helper function to check if all rooms are booked
+const checkAllRoomsBooked = async (propertyId: string, date: Date): Promise<boolean> => {
+  try {
+    const property = await propertyService.getPropertyById(propertyId);
+    if (!property) return false;
+
+    // Get all active bookings for this property
+    const q = query(
+      collection(db, BOOKINGS_COLLECTION),
+      where('propertyId', '==', propertyId),
+      where('status', '!=', 'cancelled')
+    );
+    const bookings = await getDocs(q);
+
+    // Count booked rooms for each room type
+    const bookedRooms: { [key: string]: number } = {};
+    
+    bookings.forEach(booking => {
+      const data = booking.data();
+      const bookingCheckIn = convertTimestamp(data.checkIn);
+      const bookingCheckOut = convertTimestamp(data.checkOut);
+
+      // Check if booking overlaps with the given date
+      if (date >= bookingCheckIn && date <= bookingCheckOut) {
+        const roomType = data.roomType;
+        bookedRooms[roomType] = (bookedRooms[roomType] || 0) + 1;
+      }
+    });
+
+    // Check if all room types are fully booked
+    return property.roomTypes.every(roomType => {
+      const booked = bookedRooms[roomType.name] || 0;
+      return booked >= roomType.numberOfRooms;
+    });
+  } catch (error) {
+    console.error('Error checking all rooms booked:', error);
+    return false;
+  }
+};
+
+// Helper function to update property status
+const updatePropertyStatus = async (propertyId: string, checkIn: Date, checkOut: Date) => {
+  try {
+    const isFullyBooked = await checkAllRoomsBooked(propertyId, checkIn);
+    if (isFullyBooked) {
+      await propertyService.updateProperty(propertyId, { status: 'booked' });
+    }
+  } catch (error) {
+    console.error('Error updating property status:', error);
+  }
 };
 
 export const bookingService = {
@@ -96,8 +149,74 @@ export const bookingService = {
     }
   },
 
+  async checkRoomAvailability(propertyId: string, roomType: string, checkIn: Date, checkOut: Date): Promise<boolean> {
+    try {
+      // Get property to check total rooms
+      const property = await propertyService.getPropertyById(propertyId);
+      if (!property) {
+        throw new Error('Property not found');
+      }
+
+      const roomTypeData = property.roomTypes.find(rt => rt.name === roomType);
+      if (!roomTypeData) {
+        throw new Error('Room type not found');
+      }
+
+      const totalRooms = roomTypeData.numberOfRooms;
+
+      // Get overlapping bookings
+      const q = query(
+        collection(db, BOOKINGS_COLLECTION),
+        where('propertyId', '==', propertyId),
+        where('roomType', '==', roomType),
+        where('status', '!=', 'cancelled')
+      );
+
+      const bookings = await getDocs(q);
+      let bookedRooms = 0;
+
+      bookings.forEach(booking => {
+        const data = booking.data();
+        const bookingCheckIn = convertTimestamp(data.checkIn);
+        const bookingCheckOut = convertTimestamp(data.checkOut);
+
+        // Check if dates overlap
+        if (
+          (checkIn <= bookingCheckOut && checkOut >= bookingCheckIn) ||
+          (bookingCheckIn <= checkOut && bookingCheckOut >= checkIn)
+        ) {
+          bookedRooms++;
+        }
+      });
+
+      const isAvailable = bookedRooms < totalRooms;
+
+      // If this room type is full, check if all room types are full
+      if (!isAvailable) {
+        await updatePropertyStatus(propertyId, checkIn, checkOut);
+      }
+
+      return isAvailable;
+    } catch (error) {
+      console.error('Error checking room availability:', error);
+      throw new Error('Failed to check room availability');
+    }
+  },
+
   async createBooking(data: BookingFormData): Promise<Booking> {
     try {
+      // Check room availability first
+      const isAvailable = await this.checkRoomAvailability(
+        data.propertyId,
+        data.roomType,
+        data.checkIn,
+        data.checkOut
+      );
+
+      if (!isAvailable) {
+        throw new Error('Rooms Filled');
+      }
+
       // First create or get the guest
       const guestData = {
         name: data.guestName,
@@ -149,6 +268,9 @@ export const bookingService = {
 
       const docRef = await addDoc(collection(db, BOOKINGS_COLLECTION), bookingData);
       
+      // Update property status after successful booking
+      await updatePropertyStatus(data.propertyId, data.checkIn, data.checkOut);
+
       return {
         id: docRef.id,
         ...bookingData,
@@ -157,12 +279,31 @@ export const bookingService = {
       };
     } catch (error) {
       console.error('Error creating booking:', error);
-      throw new Error('Failed to create booking');
+      throw error;
     }
   },
 
   async updateBooking(id: string, data: Partial<BookingFormData>): Promise<void> {
     try {
+      // If updating dates or room type, check availability first
+      if ((data.checkIn && data.checkOut) || data.roomType) {
+        const booking = await this.getBookingById(id);
+        if (!booking) {
+          throw new Error('Booking not found');
+        }
+
+        const isAvailable = await this.checkRoomAvailability(
+          data.propertyId || booking.propertyId,
+          data.roomType || booking.roomType,
+          data.checkIn || booking.checkIn,
+          data.checkOut || booking.checkOut
+        );
+
+        if (!isAvailable) {
+          throw new Error('Rooms Filled');
+        }
+      }
+
       const docRef = doc(db, BOOKINGS_COLLECTION, id);
       
       const updateData = {
@@ -171,9 +312,14 @@ export const bookingService = {
       };
 
       await updateDoc(docRef, updateData);
+
+      // Update property status after successful update
+      if (data.propertyId && data.checkIn && data.checkOut) {
+        await updatePropertyStatus(data.propertyId, data.checkIn, data.checkOut);
+      }
     } catch (error) {
       console.error('Error updating booking:', error);
-      throw new Error('Failed to update booking');
+      throw error;
     }
   },
 
@@ -183,7 +329,7 @@ export const bookingService = {
       await deleteDoc(docRef);
     } catch (error) {
       console.error('Error deleting booking:', error);
-      throw new Error('Failed to delete booking');
+      throw error;
     }
   }
 };

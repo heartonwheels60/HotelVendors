@@ -225,14 +225,29 @@ export const ReviewFormPage: React.FC = () => {
 
         {/* Review Comment */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Your Review</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Share your experience</label>
+          <p className="text-sm text-gray-500 mb-3">
+            Tell other travelers about your stay. What did you like most? What could be improved? Your detailed review helps both future guests and the property.
+          </p>
           <textarea
             value={formData.comment}
             onChange={(e) => setFormData(prev => ({ ...prev, comment: e.target.value }))}
-            rows={4}
-            className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Write your detailed review here... (minimum 100 characters)"
+            rows={8}
+            className="mt-1 block w-full py-3 px-4 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-700"
             required
+            minLength={100}
           />
+          <div className="mt-2 flex justify-between items-center">
+            <span className="text-sm text-gray-500">
+              {formData.comment.length} / 2000 characters
+            </span>
+            {formData.comment.length < 100 && (
+              <span className="text-sm text-orange-500">
+                Please write at least 100 characters
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Image Upload */}

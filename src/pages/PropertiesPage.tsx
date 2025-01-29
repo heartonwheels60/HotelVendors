@@ -1,26 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Plus, Edit, Trash2, AlertCircle, Building2 } from 'lucide-react';
 import { propertyService } from '../services/propertyService';
 import type { Property } from '../types/property';
 
 // Function to get amenity name from ID
 const getAmenityName = (id: string): string => {
-  const amenityMap: Record<string, string> = {
-    wifi: 'WiFi',
-    parking: 'Parking',
-    swimmingPool: 'Swimming Pool',
-    gym: 'Fitness Center',
-    spa: 'Spa',
-    restaurant: 'Restaurant',
-    bar: 'Bar/Lounge',
-    breakfast: 'Breakfast',
-    roomService: 'Room Service',
-    airConditioning: 'Air Conditioning',
-    laundry: 'Laundry Service',
-    businessCenter: 'Business Center'
-  };
-  return amenityMap[id] || id;
+  // Convert amenityId to display name (e.g., 'firstAid' -> 'First Aid')
+  return id
+    .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+    .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+    .trim();
 };
 
 // Function to group properties by base name (without room type)
@@ -38,92 +28,85 @@ const groupProperties = (properties: Property[]): Record<string, Property[]> => 
 
 // Memoized property card component
 const PropertyCard = React.memo(({ 
-  propertyGroup,
+  property,
   onEdit, 
   onDelete 
 }: { 
-  propertyGroup: Property[];
+  property: Property;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 }) => {
-  const baseProperty = propertyGroup[0];
-  const baseName = baseProperty.name.split(' - ')[0];
-
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <div className="flex justify-between items-start mb-4">
-        <div className="relative aspect-w-16 aspect-h-9 flex-grow">
-          <img
-            src={baseProperty.images[0] || '/placeholder-property.jpg'}
-            alt={baseName}
-            className="object-cover rounded-lg"
-          />
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Building2 className="h-5 w-5 text-gray-400" />
+            <span className="ml-2 text-lg font-medium text-gray-900">{property.name}</span>
+          </div>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            property.status === 'active' ? 'bg-green-100 text-green-800' :
+            property.status === 'booked' ? 'bg-blue-100 text-blue-800' :
+            property.status === 'maintenance' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-red-100 text-red-800'
+          }`}>
+            {property.status.charAt(0).toUpperCase() + property.status.slice(1)}
+          </span>
         </div>
-        <span className={`ml-4 px-2.5 py-1 rounded-full text-xs font-medium ${
-          baseProperty.status === 'active' 
-            ? 'bg-green-100 text-green-800'
-            : baseProperty.status === 'maintenance'
-            ? 'bg-yellow-100 text-yellow-800'
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {baseProperty.status.charAt(0).toUpperCase() + baseProperty.status.slice(1)}
-        </span>
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{baseName}</h3>
-      <p className="text-gray-600 mb-4">{baseProperty.address}</p>
 
-      {/* Room Types & Prices */}
-      <div className="mb-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Room Types & Prices</h4>
-        <div className="grid grid-cols-1 gap-2">
-          {propertyGroup.map(property => (
-            <div key={property.id} className="flex justify-between items-center py-1 border-b border-gray-100">
-              <span className="text-sm text-gray-600">{property.roomTypes[0]?.name}</span>
-              <span className="text-sm font-medium text-gray-900">
-                ${property.roomTypes[0]?.price.toFixed(2)}
+        <p className="mt-2 text-sm text-gray-500">{property.address}</p>
+
+        {/* Room Types */}
+        <div className="mt-4">
+          <h3 className="text-sm font-medium text-gray-900">Room Types & Prices</h3>
+          <div className="mt-2 space-y-2">
+            {property.roomTypes.map((room, index) => (
+              <div key={index} className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">{room.name}</span>
+                <div className="text-gray-900">
+                  <span className="font-medium">${room.price}</span>
+                  <span className="text-gray-500 ml-2">· {room.numberOfRooms} rooms</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Amenities */}
+        <div className="mt-4">
+          <h3 className="text-sm font-medium text-gray-900">Amenities</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {property.amenities.slice(0, 3).map((amenity, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+              >
+                {getAmenityName(amenity)}
               </span>
-            </div>
-          ))}
+            ))}
+            {property.amenities.length > 3 && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                +{property.amenities.length - 3} more
+              </span>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Amenities */}
-      <div className="mb-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Amenities</h4>
-        <div className="flex flex-wrap gap-2">
-          {baseProperty.amenities.slice(0, 3).map(amenity => (
-            <span
-              key={amenity}
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-            >
-              {getAmenityName(amenity)}
-            </span>
-          ))}
-          {baseProperty.amenities.length > 3 && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-              +{baseProperty.amenities.length - 3} more
-            </span>
-          )}
+        {/* Actions */}
+        <div className="mt-6 flex justify-end space-x-3">
+          <button
+            onClick={() => onEdit(property.id)}
+            className="inline-flex items-center text-blue-600 hover:text-blue-700"
+          >
+            <Edit className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => onDelete(property.id)}
+            className="inline-flex items-center text-red-600 hover:text-red-700"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => onEdit(propertyGroup[0].id)}
-          className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-        >
-          <Edit className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => {
-            // Delete all properties in the group
-            propertyGroup.forEach(property => onDelete(property.id));
-          }}
-          className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
       </div>
     </div>
   );
@@ -186,26 +169,24 @@ export const PropertiesPage: React.FC = () => {
     );
   }
 
-  const propertyGroups = groupProperties(properties);
-
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Properties</h1>
-        <button
-          onClick={() => navigate('/properties/new')}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        <Link
+          to="/properties/new"
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
         >
           <Plus className="h-5 w-5 mr-2" />
           Add Property
-        </button>
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Object.values(propertyGroups).map(group => (
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {properties.map((property) => (
           <PropertyCard
-            key={group[0].id}
-            propertyGroup={group}
+            key={property.id}
+            property={property}
             onEdit={(id) => navigate(`/properties/edit/${id}`)}
             onDelete={handleDelete}
           />

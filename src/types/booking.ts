@@ -1,4 +1,4 @@
-export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
+export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'checkedIn' | 'checkedOut' | 'noShow';
 
 export interface Guest {
   id: string;
@@ -24,8 +24,17 @@ export interface Booking {
   updatedAt: Date;
 }
 
-export interface BookingFormData extends Omit<Booking, 'id' | 'createdAt' | 'updatedAt' | 'guest' | 'guestId'> {
+export interface BookingFormData {
+  propertyId: string;
+  propertyName: string;
+  roomType: string;
   guestName: string;
   guestEmail: string;
   guestPhone?: string;
+  checkIn: Date;
+  checkOut: Date;
+  numberOfGuests: number;
+  totalAmount: number;
+  status: BookingStatus;
+  notes?: string;
 }
