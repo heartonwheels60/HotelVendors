@@ -30,21 +30,30 @@ const convertTimestamp = (timestamp: any): Date => {
 
 // Helper function to convert Firestore data to Booking type
 const convertBookingData = (docData: DocumentData, id: string): Booking => {
+  const checkIn = docData.checkIn ? convertTimestamp(docData.checkIn) : new Date();
+  const checkOut = docData.checkOut ? convertTimestamp(docData.checkOut) : new Date();
+  const createdAt = docData.createdAt ? convertTimestamp(docData.createdAt) : new Date();
+  const updatedAt = docData.updatedAt ? convertTimestamp(docData.updatedAt) : new Date();
+
   return {
     id,
     propertyId: docData.propertyId || '',
     propertyName: docData.propertyName || '',
     roomType: docData.roomType || '',
     guestId: docData.guestId || '',
-    guest: docData.guest || {},
-    checkIn: convertTimestamp(docData.checkIn),
-    checkOut: convertTimestamp(docData.checkOut),
+    guest: {
+      name: docData.guest?.name || '',
+      email: docData.guest?.email || '',
+      phone: docData.guest?.phone || ''
+    },
+    checkIn,
+    checkOut,
     numberOfGuests: docData.numberOfGuests || 1,
     totalAmount: docData.totalAmount || 0,
     status: docData.status || 'pending',
-    notes: docData.notes,
-    createdAt: convertTimestamp(docData.createdAt),
-    updatedAt: convertTimestamp(docData.updatedAt)
+    notes: docData.notes || '',
+    createdAt,
+    updatedAt
   };
 };
 
@@ -149,7 +158,13 @@ export const bookingService = {
     }
   },
 
-  async checkRoomAvailability(propertyId: string, roomType: string, checkIn: Date, checkOut: Date): Promise<boolean> {
+  async checkRoomAvailability(
+    propertyId: string, 
+    roomType: string, 
+    checkIn: Date, 
+    checkOut: Date, 
+    excludeBookingId?: string
+  ): Promise<boolean> {
     try {
       // Get property to check total rooms
       const property = await propertyService.getPropertyById(propertyId);
@@ -167,9 +182,7 @@ export const bookingService = {
       // Get overlapping bookings
       const q = query(
         collection(db, BOOKINGS_COLLECTION),
-        where('propertyId', '==', propertyId),
-        where('roomType', '==', roomType),
-        where('status', '!=', 'cancelled')
+        where('propertyId', '==', propertyId)
       );
 
       const bookings = await getDocs(q);
@@ -177,6 +190,14 @@ export const bookingService = {
 
       bookings.forEach(booking => {
         const data = booking.data();
+        // Skip if not the right room type, if cancelled, or if it's the booking being updated
+        if (
+          data.roomType !== roomType || 
+          data.status === 'cancelled' || 
+          (excludeBookingId && booking.id === excludeBookingId)
+        ) {
+          return;
+        }
         const bookingCheckIn = convertTimestamp(data.checkIn);
         const bookingCheckOut = convertTimestamp(data.checkOut);
 
@@ -285,18 +306,20 @@ export const bookingService = {
 
   async updateBooking(id: string, data: Partial<BookingFormData>): Promise<void> {
     try {
+      // Get current booking data
+      const booking = await this.getBookingById(id);
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+
       // If updating dates or room type, check availability first
       if ((data.checkIn && data.checkOut) || data.roomType) {
-        const booking = await this.getBookingById(id);
-        if (!booking) {
-          throw new Error('Booking not found');
-        }
-
         const isAvailable = await this.checkRoomAvailability(
           data.propertyId || booking.propertyId,
           data.roomType || booking.roomType,
           data.checkIn || booking.checkIn,
-          data.checkOut || booking.checkOut
+          data.checkOut || booking.checkOut,
+          id
         );
 
         if (!isAvailable) {
@@ -306,10 +329,39 @@ export const bookingService = {
 
       const docRef = doc(db, BOOKINGS_COLLECTION, id);
       
-      const updateData = {
-        ...data,
+      // Prepare update data
+      const updateData: any = {
         updatedAt: serverTimestamp()
       };
+
+      // Update property and room info
+      if (data.propertyId) {
+        const property = await propertyService.getPropertyById(data.propertyId);
+        if (!property) {
+          throw new Error('Property not found');
+        }
+        updateData.propertyId = data.propertyId;
+        updateData.propertyName = property.name;
+      }
+      
+      if (data.roomType) updateData.roomType = data.roomType;
+      if (data.numberOfGuests) updateData.numberOfGuests = data.numberOfGuests;
+      if (data.totalAmount) updateData.totalAmount = data.totalAmount;
+      if (data.status) updateData.status = data.status;
+      if (data.notes) updateData.notes = data.notes;
+
+      // Update dates
+      if (data.checkIn) updateData.checkIn = Timestamp.fromDate(new Date(data.checkIn));
+      if (data.checkOut) updateData.checkOut = Timestamp.fromDate(new Date(data.checkOut));
+
+      // Update guest info
+      if (data.guestName || data.guestEmail || data.guestPhone) {
+        updateData.guest = {
+          name: data.guestName || booking.guest.name,
+          email: data.guestEmail || booking.guest.email,
+          phone: data.guestPhone || booking.guest.phone
+        };
+      }
 
       await updateDoc(docRef, updateData);
 

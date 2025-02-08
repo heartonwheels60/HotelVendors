@@ -8,6 +8,7 @@ export interface RoomType {
 
 export interface Property {
   id: string;
+  userId: string;
   name: string;
   description: string;
   address: string;
@@ -19,7 +20,7 @@ export interface Property {
   updatedAt?: Date;
 }
 
-export interface PropertyFormData extends Omit<Property, 'id' | 'createdAt' | 'updatedAt'> {
+export interface PropertyFormData extends Omit<Property, 'id' | 'userId' | 'createdAt' | 'updatedAt'> {
   roomTypes: Array<{
     name: RoomTypeName;
     price: number;

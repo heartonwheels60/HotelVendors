@@ -1,4 +1,5 @@
 import { db } from '../config/firebase';
+import { auth } from '../config/firebase';
 import {
   collection,
   doc,
@@ -10,6 +11,7 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  where,
   DocumentData,
   writeBatch
 } from 'firebase/firestore';
@@ -30,6 +32,7 @@ const convertRoomData = (room: DocumentData): RoomType => {
 const convertPropertyData = (docData: DocumentData, id: string): Property => {
   return {
     id,
+    userId: docData.userId || '',
     name: docData.name || '',
     description: docData.description || '',
     address: docData.address || '',
@@ -47,9 +50,19 @@ const convertPropertyData = (docData: DocumentData, id: string): Property => {
 export const propertyService = {
   async getProperties(): Promise<Property[]> {
     try {
-      const q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'));
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('No authenticated user');
+      }
+
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('userId', '==', currentUser.uid)
+      );
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => convertPropertyData(doc.data(), doc.id));
+      return querySnapshot.docs
+        .map(doc => convertPropertyData(doc.data(), doc.id))
+        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
     } catch (error) {
       console.error('Error getting properties:', error);
       throw error;
@@ -74,8 +87,14 @@ export const propertyService = {
 
   async createProperty(data: PropertyFormData): Promise<Property[]> {
     try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('No authenticated user');
+      }
+
       const propertyData = {
         ...data,
+        userId: currentUser.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         roomTypes: data.roomTypes.map(room => ({

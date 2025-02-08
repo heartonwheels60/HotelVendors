@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 import { bookingService } from '../services/bookingService';
@@ -11,44 +11,62 @@ export const BookingFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
-  const { checkIn, checkOut } = location.state || {};
+  const { propertyId: initialPropertyId, roomType: initialRoomType, checkIn: initialCheckIn, checkOut: initialCheckOut } = location.state || {};
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   
   // Get today's date for validation
-  const today = startOfDay(new Date());
-  const todayStr = format(today, 'yyyy-MM-dd');
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const todayStr = useMemo(() => format(today, 'yyyy-MM-dd'), [today]);
 
   const [formData, setFormData] = useState<BookingFormData>({
-    propertyId: '',
+    propertyId: initialPropertyId || '',
     propertyName: '',
-    roomType: '',
+    roomType: initialRoomType || '',
     guestName: '',
     guestEmail: '',
     guestPhone: '',
-    checkIn: isBefore(checkIn || today, today) ? today : (checkIn || today),
-    checkOut: isBefore(checkOut || today, today) ? today : (checkOut || today),
+    checkIn: initialCheckIn ? new Date(initialCheckIn) : today,
+    checkOut: initialCheckOut ? new Date(initialCheckOut) : today,
     numberOfGuests: 1,
     totalAmount: 0,
     status: 'pending',
     notes: ''
   });
 
+  // Load properties once
   useEffect(() => {
     const loadProperties = async () => {
       try {
         const data = await propertyService.getProperties();
         setProperties(data);
+        
+        // If we have initialPropertyId, set initial property name and room type
+        if (initialPropertyId) {
+          const property = data.find(p => p.id === initialPropertyId);
+          if (property) {
+            setFormData(prev => ({
+              ...prev,
+              propertyName: property.name,
+              totalAmount: property.roomTypes.find(rt => rt.name === initialRoomType)?.price || 0
+            }));
+          }
+        }
       } catch (err) {
         console.error('Error loading properties:', err);
         setError('Failed to load properties');
       }
     };
 
+    loadProperties();
+  }, []); // Empty dependency array as this should only run once
+
+  // Load booking data when id changes
+  useEffect(() => {
     const loadBooking = async () => {
-      if (!id) return;
+      if (!id || !properties.length) return;
       
       try {
         setIsLoading(true);
@@ -57,9 +75,14 @@ export const BookingFormPage: React.FC = () => {
           // Don't allow editing past bookings
           if (isBefore(booking.checkIn, today)) {
             setError('Cannot edit past bookings');
+            setIsLoading(false);
             return;
           }
           
+          // Find the property to get the current price
+          const property = properties.find(p => p.id === booking.propertyId);
+          const currentPrice = property?.roomTypes.find(rt => rt.name === booking.roomType)?.price || booking.totalAmount;
+
           setFormData({
             propertyId: booking.propertyId,
             propertyName: booking.propertyName,
@@ -67,10 +90,10 @@ export const BookingFormPage: React.FC = () => {
             guestName: booking.guest.name,
             guestEmail: booking.guest.email,
             guestPhone: booking.guest.phone || '',
-            checkIn: booking.checkIn,
-            checkOut: booking.checkOut,
+            checkIn: new Date(booking.checkIn),
+            checkOut: new Date(booking.checkOut),
             numberOfGuests: booking.numberOfGuests,
-            totalAmount: booking.totalAmount,
+            totalAmount: currentPrice,
             status: booking.status,
             notes: booking.notes || ''
           });
@@ -83,65 +106,92 @@ export const BookingFormPage: React.FC = () => {
       }
     };
 
-    loadProperties();
     loadBooking();
-  }, [id, today]);
+  }, [id, properties]); // Only depend on id and properties
+
+  // Memoize handlers to prevent unnecessary re-renders
+  const handlePropertyChange = useCallback((propertyId: string) => {
+    const property = properties.find(p => p.id === propertyId);
+    if (property) {
+      const firstRoomType = property.roomTypes[0];
+      setFormData(prev => ({
+        ...prev,
+        propertyId: property.id,
+        propertyName: property.name,
+        roomType: firstRoomType?.name || '',
+        totalAmount: firstRoomType?.price || 0
+      }));
+    }
+  }, [properties]);
+
+  const handleRoomTypeChange = useCallback((roomTypeName: string) => {
+    const property = properties.find(p => p.id === formData.propertyId);
+    const roomType = property?.roomTypes.find(rt => rt.name === roomTypeName);
+    if (roomType) {
+      setFormData(prev => ({
+        ...prev,
+        roomType: roomType.name,
+        totalAmount: roomType.price
+      }));
+    }
+  }, [properties, formData.propertyId]);
+
+  const handleDateChange = useCallback((field: 'checkIn' | 'checkOut', value: string) => {
+    const date = new Date(value);
+    setFormData(prev => ({
+      ...prev,
+      [field]: date
+    }));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate dates
-    if (isBefore(formData.checkIn, today)) {
-      setError('Check-in date cannot be in the past');
-      return;
-    }
-    
-    if (isBefore(formData.checkOut, formData.checkIn)) {
-      setError('Check-out date must be after check-in date');
-      return;
-    }
     
     try {
       setIsLoading(true);
       setError(null);
 
+      // Validate dates
+      const checkInDate = startOfDay(new Date(formData.checkIn));
+      const checkOutDate = startOfDay(new Date(formData.checkOut));
+      const todayDate = startOfDay(new Date());
+
+      if (isBefore(checkInDate, todayDate)) {
+        setError('Check-in date cannot be in the past');
+        return;
+      }
+      
+      if (isBefore(checkOutDate, checkInDate)) {
+        setError('Check-out date must be after check-in date');
+        return;
+      }
+
+      const submissionData = {
+        ...formData,
+        checkIn: checkInDate,
+        checkOut: checkOutDate,
+        guest: {
+          name: formData.guestName,
+          email: formData.guestEmail,
+          phone: formData.guestPhone
+        }
+      };
+
       if (id) {
-        // For updates, only send the changed fields
-        const updates: Partial<BookingFormData> = {
-          checkIn: formData.checkIn,
-          checkOut: formData.checkOut,
-          numberOfGuests: formData.numberOfGuests,
-          guestName: formData.guestName,
-          guestEmail: formData.guestEmail,
-          guestPhone: formData.guestPhone,
-          notes: formData.notes
-        };
-        await bookingService.updateBooking(id, updates);
+        await bookingService.updateBooking(id, submissionData);
       } else {
-        await bookingService.createBooking(formData);
+        await bookingService.createBooking(submissionData);
       }
       navigate('/bookings');
     } catch (err: any) {
       console.error('Error saving booking:', err);
       if (err.message === 'Rooms Filled') {
-        setError('Rooms Filled');
+        setError('Selected room type is not available for these dates');
       } else {
         setError('Failed to save booking');
       }
+    } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handlePropertyChange = (propertyId: string) => {
-    const property = properties.find(p => p.id === propertyId);
-    if (property) {
-      setFormData(prev => ({
-        ...prev,
-        propertyId: property.id,
-        propertyName: property.name,
-        roomType: property.roomTypes[0]?.name || '',
-        totalAmount: property.roomTypes[0]?.price || 0
-      }));
     }
   };
 
@@ -189,7 +239,6 @@ export const BookingFormPage: React.FC = () => {
             onChange={(e) => handlePropertyChange(e.target.value)}
             className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             required
-            disabled={id !== undefined}
           >
             <option value="">Select a property</option>
             {properties.map(property => (
@@ -205,18 +254,9 @@ export const BookingFormPage: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700">Room Type</label>
           <select
             value={formData.roomType}
-            onChange={(e) => {
-              const property = properties.find(p => p.id === formData.propertyId);
-              const roomType = property?.roomTypes.find(rt => rt.name === e.target.value);
-              setFormData(prev => ({ 
-                ...prev, 
-                roomType: e.target.value,
-                totalAmount: roomType?.price || prev.totalAmount
-              }));
-            }}
+            onChange={(e) => handleRoomTypeChange(e.target.value)}
             className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             required
-            disabled={id !== undefined}
           >
             <option value="">Select a room type</option>
             {properties
@@ -277,7 +317,7 @@ export const BookingFormPage: React.FC = () => {
                 type="date"
                 value={format(formData.checkIn, 'yyyy-MM-dd')}
                 min={todayStr}
-                onChange={(e) => setFormData(prev => ({ ...prev, checkIn: new Date(e.target.value) }))}
+                onChange={(e) => handleDateChange('checkIn', e.target.value)}
                 className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
               />
@@ -289,7 +329,7 @@ export const BookingFormPage: React.FC = () => {
                 type="date"
                 value={format(formData.checkOut, 'yyyy-MM-dd')}
                 min={format(formData.checkIn, 'yyyy-MM-dd')}
-                onChange={(e) => setFormData(prev => ({ ...prev, checkOut: new Date(e.target.value) }))}
+                onChange={(e) => handleDateChange('checkOut', e.target.value)}
                 className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
               />

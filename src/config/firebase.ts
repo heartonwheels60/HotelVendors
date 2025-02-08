@@ -4,13 +4,13 @@ import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBILV267yY6adZYRt6gz7qO8NO7RJoSzJo",
-  authDomain: "heart-on-wheels.firebaseapp.com",
-  databaseURL: "https://heart-on-wheels-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "heart-on-wheels",
-  storageBucket: "heart-on-wheels.firebasestorage.app",
-  messagingSenderId: "210758606190",
-  appId: "1:210758606190:web:0979e3de0045b71e8c357f"
+  apiKey: "AIzaSyAGneswXx14HIpw7lZ1dqINU2f5jJIxg2s",
+  authDomain: "how-dev-team.firebaseapp.com",
+  projectId: "how-dev-team",
+  storageBucket: "how-dev-team.firebasestorage.app",
+  messagingSenderId: "530990096651",
+  appId: "1:530990096651:web:684c8a7ba6d1dbd340420e",
+  measurementId: "G-FL7VYVKZ9G"
 };
 
 // Initialize Firebase

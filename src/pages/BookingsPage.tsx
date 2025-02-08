@@ -122,7 +122,7 @@ export const BookingsPage: React.FC = () => {
     loadBookings();
   }, [loadBookings]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this booking?')) {
       return;
     }
@@ -134,7 +134,21 @@ export const BookingsPage: React.FC = () => {
       console.error('Error deleting booking:', err);
       setError('Failed to delete booking');
     }
-  };
+  }, [loadBookings]);
+
+  const handleEdit = useCallback((booking: Booking) => {
+    const checkInDate = new Date(booking.checkIn);
+    const checkOutDate = new Date(booking.checkOut);
+    
+    navigate(`/bookings/edit/${booking.id}`, {
+      state: {
+        propertyId: booking.propertyId,
+        roomType: booking.roomType,
+        checkIn: checkInDate.toISOString(),
+        checkOut: checkOutDate.toISOString()
+      }
+    });
+  }, [navigate]);
 
   if (isLoading) {
     return (
@@ -182,7 +196,7 @@ export const BookingsPage: React.FC = () => {
           <BookingCard
             key={booking.id}
             booking={booking}
-            onEdit={() => navigate(`/bookings/edit/${booking.id}`)}
+            onEdit={() => handleEdit(booking)}
             onDelete={() => handleDelete(booking.id)}
           />
         ))}
