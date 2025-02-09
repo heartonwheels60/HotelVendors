@@ -14,6 +14,7 @@ import {
   DocumentData,
   Timestamp
 } from 'firebase/firestore';
+import { auth } from '../config/firebase';
 import type { Booking, BookingFormData, Guest } from '../types/booking';
 import { propertyService } from './propertyService';
 
@@ -53,7 +54,8 @@ const convertBookingData = (docData: DocumentData, id: string): Booking => {
     status: docData.status || 'pending',
     notes: docData.notes || '',
     createdAt,
-    updatedAt
+    updatedAt,
+    userId: docData.userId || ''
   };
 };
 
@@ -109,41 +111,88 @@ const updatePropertyStatus = async (propertyId: string, checkIn: Date, checkOut:
   }
 };
 
+// Helper function to get current user ID
+const getCurrentUserId = () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  return user.uid;
+};
+
 export const bookingService = {
   async getBookings(): Promise<Booking[]> {
     try {
-      const q = query(collection(db, BOOKINGS_COLLECTION), orderBy('createdAt', 'desc'));
+      const userId = getCurrentUserId();
+      
+      // Simplified query without ordering until index is created
+      const q = query(
+        collection(db, BOOKINGS_COLLECTION),
+        where('userId', '==', userId)
+      );
+      
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map(doc => 
-        convertBookingData(doc.data(), doc.id)
-      );
-    } catch (error) {
+      // Convert and sort on client side
+      return querySnapshot.docs
+        .map(doc => convertBookingData(doc.data(), doc.id))
+        .sort((a, b) => {
+          const dateA = a.createdAt?.getTime() || 0;
+          const dateB = b.createdAt?.getTime() || 0;
+          return dateB - dateA;
+        });
+    } catch (error: any) {
       console.error('Error getting bookings:', error);
-      throw new Error('Failed to load bookings');
+      
+      if (error.message === 'Please log in to continue') {
+        throw new Error('Please log in to view your bookings');
+      }
+      
+      if (error.code === 'permission-denied') {
+        throw new Error('You do not have permission to access these bookings');
+      }
+
+      throw new Error('Failed to load bookings. Please try again.');
     }
   },
 
   async getBookingsByPropertyId(propertyId: string): Promise<Booking[]> {
     try {
+      const userId = getCurrentUserId();
+      
+      // Simplified query without ordering until index is created
       const q = query(
         collection(db, BOOKINGS_COLLECTION),
-        where('propertyId', '==', propertyId),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', userId),
+        where('propertyId', '==', propertyId)
       );
+      
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map(doc => 
-        convertBookingData(doc.data(), doc.id)
-      );
-    } catch (error) {
+      // Convert and sort on client side
+      return querySnapshot.docs
+        .map(doc => convertBookingData(doc.data(), doc.id))
+        .sort((a, b) => {
+          const dateA = a.createdAt?.getTime() || 0;
+          const dateB = b.createdAt?.getTime() || 0;
+          return dateB - dateA;
+        });
+    } catch (error: any) {
       console.error('Error getting bookings:', error);
-      throw new Error('Failed to load bookings');
+      
+      if (error.message === 'Please log in to continue') {
+        throw new Error('Please log in to view your bookings');
+      }
+      
+      if (error.code === 'permission-denied') {
+        throw new Error('You do not have permission to access these bookings');
+      }
+
+      throw new Error('Failed to load bookings. Please try again.');
     }
   },
 
   async getBookingById(id: string): Promise<Booking | null> {
     try {
+      const userId = getCurrentUserId();
       const docRef = doc(db, BOOKINGS_COLLECTION, id);
       const docSnap = await getDoc(docRef);
       
@@ -151,10 +200,16 @@ export const bookingService = {
         return null;
       }
 
-      return convertBookingData(docSnap.data(), docSnap.id);
+      const data = docSnap.data();
+      // Verify the booking belongs to the current user
+      if (data.userId !== userId) {
+        throw new Error('Unauthorized access to booking');
+      }
+
+      return convertBookingData(data, docSnap.id);
     } catch (error) {
       console.error('Error getting booking:', error);
-      throw new Error('Failed to load booking');
+      throw error;
     }
   },
 
@@ -226,7 +281,9 @@ export const bookingService = {
 
   async createBooking(data: BookingFormData): Promise<Booking> {
     try {
-      // Check room availability first
+      const userId = getCurrentUserId();
+      
+      // Check room availability
       const isAvailable = await this.checkRoomAvailability(
         data.propertyId,
         data.roomType,
@@ -270,7 +327,6 @@ export const bookingService = {
         guest = { id: guestId, ...existingGuest.data() } as Guest;
       }
 
-      // Then create the booking
       const bookingData = {
         propertyId: data.propertyId,
         propertyName: data.propertyName,
@@ -283,6 +339,7 @@ export const bookingService = {
         totalAmount: data.totalAmount,
         status: data.status,
         notes: data.notes,
+        userId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -306,10 +363,15 @@ export const bookingService = {
 
   async updateBooking(id: string, data: Partial<BookingFormData>): Promise<void> {
     try {
-      // Get current booking data
+      const userId = getCurrentUserId();
       const booking = await this.getBookingById(id);
+      
       if (!booking) {
         throw new Error('Booking not found');
+      }
+
+      if (booking.userId !== userId) {
+        throw new Error('Unauthorized access to booking');
       }
 
       // If updating dates or room type, check availability first
@@ -377,6 +439,17 @@ export const bookingService = {
 
   async deleteBooking(id: string): Promise<void> {
     try {
+      const userId = getCurrentUserId();
+      const booking = await this.getBookingById(id);
+      
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+
+      if (booking.userId !== userId) {
+        throw new Error('Unauthorized access to booking');
+      }
+
       const docRef = doc(db, BOOKINGS_COLLECTION, id);
       await deleteDoc(docRef);
     } catch (error) {
