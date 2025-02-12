@@ -4,14 +4,14 @@ import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBILV267yY6adZYRt6gz7qO8NO7RJoSzJo",
-  authDomain: "heart-on-wheels.firebaseapp.com",
-  databaseURL: "https://heart-on-wheels-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "heart-on-wheels",
-  storageBucket: "heart-on-wheels.firebasestorage.app",
-  messagingSenderId: "210758606190",
-  appId: "1:210758606190:web:0979e3de0045b71e8c357f",
-  measurementId: "G-BRS3W1QYMK"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase only if it hasn't been initialized
@@ -25,19 +25,8 @@ try {
 }
 
 // Initialize Firebase services
-let db;
-let auth;
-let storage;
+const db = getFirestore(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
 
-try {
-  db = getFirestore(app);
-  auth = getAuth(app);
-  storage = getStorage(app);
-  console.log('Firebase services initialized successfully');
-} catch (error) {
-  console.error('Error initializing Firebase services:', error);
-  throw new Error('Failed to initialize Firebase services.');
-}
-
-// Export initialized services
-export { db, auth, storage, app as default };
+export { db, auth, storage };

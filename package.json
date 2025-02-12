@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
+    "@fullcalendar/core": "^6.1.15",
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/interaction": "^6.1.15",
+    "@fullcalendar/react": "^6.1.15",
+    "@heroicons/react": "^2.2.0",
     "axios": "^1.7.9",
     "classnames": "^2.5.1",
     "clsx": "^2.1.1",

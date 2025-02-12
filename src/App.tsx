@@ -17,6 +17,7 @@ import { ReviewFormPage } from './pages/ReviewFormPage';
 import { StaffPage } from './pages/StaffPage';
 import { StaffFormPage } from './pages/StaffFormPage';
 import { StaffSchedulePage } from './pages/StaffSchedulePage';
+import { PricingPage } from './pages/PricingPage';
 import Dashboard from './pages/Dashboard';
 import RoomManagement from './pages/RoomManagement';
 import NotFound from './pages/NotFound';
@@ -50,6 +51,11 @@ function App() {
                 <Route path="/hotels" element={<HotelsPage />} />
                 <Route path="/hotels/new" element={<HotelFormPage />} />
                 <Route path="/hotels/edit/:id" element={<HotelFormPage />} />
+                <Route path="/pricing" element={
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <PricingPage />
+                  </Suspense>
+                } />
                 <Route path="/rooms" element={
                   <Suspense fallback={<LoadingSpinner />}>
                     <RoomManagement />
