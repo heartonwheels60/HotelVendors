@@ -4,6 +4,8 @@ import type { RoomDetails, PricingOption } from '../../types/room';
 import { AmenitySelector } from './AmenitySelector';
 import { PricingOptionsForm } from './PricingOptionsForm';
 import { RoomPreview } from './RoomPreview';
+import { DynamicPricingForm } from './DynamicPricingForm';
+import type { DynamicPricing } from '../../types/pricing';
 
 interface RoomFormProps {
   onSubmit: (room: Partial<RoomDetails>) => void;
@@ -14,6 +16,14 @@ export const RoomForm: React.FC<RoomFormProps> = ({ onSubmit, initialData }) => 
   const [room, setRoom] = useState<Partial<RoomDetails>>(initialData || {
     type: 'standard',
     pricingOptions: [{ type: 'room-only', price: 0 }],
+    dynamicPricing: {
+      roomOnly: {
+        basePrice: 0,
+        weekendMultiplier: 1.3,
+        specialDays: [],
+        seasonalPricing: []
+      }
+    },
     amenities: [],
     images: [],
     isSmokingAllowed: false,
@@ -184,6 +194,25 @@ export const RoomForm: React.FC<RoomFormProps> = ({ onSubmit, initialData }) => 
             options={room.pricingOptions || []}
             onChange={options => setRoom(prev => ({ ...prev, pricingOptions: options }))}
           />
+
+          <div className="border-t pt-6 mt-6">
+            <h3 className="text-lg font-medium mb-4">Dynamic Pricing</h3>
+            <div className="space-y-6">
+              <DynamicPricingForm
+                initialData={room.dynamicPricing?.roomOnly}
+                onChange={(pricing) =>
+                  setRoom((prev) => ({
+                    ...prev,
+                    dynamicPricing: {
+                      ...prev.dynamicPricing,
+                      roomOnly: pricing,
+                    },
+                  }))
+                }
+                roomType={room.type}
+              />
+            </div>
+          </div>
 
           <div className="flex justify-end space-x-4">
             <button

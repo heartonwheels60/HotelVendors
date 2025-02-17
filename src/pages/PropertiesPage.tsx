@@ -73,6 +73,21 @@ const PropertyCard = React.memo(({
           </div>
         </div>
 
+        {/* Dynamic Pricing Info */}
+        <div className="mt-4">
+          <h3 className="text-sm font-medium text-gray-900">Dynamic Pricing</h3>
+          <div className="mt-2 text-sm text-gray-600">
+            <div className="flex items-center space-x-4">
+              <span>
+                <span className="font-medium">Weekend Rate:</span> {property.weekendMultiplier || 1.2}x
+              </span>
+              <span>
+                <span className="font-medium">Seasonal Rules:</span> {property.seasonalPricing?.length || 0} active
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Amenities */}
         <div className="mt-4">
           <h3 className="text-sm font-medium text-gray-900">Amenities</h3>
@@ -95,6 +110,12 @@ const PropertyCard = React.memo(({
 
         {/* Actions */}
         <div className="mt-6 flex justify-end space-x-3">
+          <Link
+            to={`/pricing/${property.id}`}
+            className="inline-flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 rounded-md"
+          >
+            Manage All Prices
+          </Link>
           <button
             onClick={() => onEdit(property.id)}
             className="inline-flex items-center text-blue-600 hover:text-blue-700"

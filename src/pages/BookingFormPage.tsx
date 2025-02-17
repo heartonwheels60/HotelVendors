@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 import { bookingService } from '../services/bookingService';
 import { propertyService } from '../services/propertyService';
+import { DynamicPriceCalculator } from '../components/bookings/DynamicPriceCalculator';
 import type { BookingFormData, BookingStatus } from '../types/booking';
 import type { Property } from '../types/property';
-import { format, isBefore, startOfDay } from 'date-fns';
+import type { DynamicPricing } from '../types/pricing';
+import { format, isBefore, startOfDay, addDays } from 'date-fns';
+import { useDynamicPricing } from '../contexts/DynamicPricingContext';
 
 export const BookingFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +21,9 @@ export const BookingFormPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedBoardType, setSelectedBoardType] = useState<'room-only' | 'breakfast-included' | 'half-board' | 'full-board'>('room-only');
+  const { dynamicPricing, loadDynamicPricing, updateBasePrice } = useDynamicPricing();
   
   // Get today's date for validation
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -28,13 +36,72 @@ export const BookingFormPage: React.FC = () => {
     guestName: '',
     guestEmail: '',
     guestPhone: '',
-    checkIn: initialCheckIn ? new Date(initialCheckIn) : today,
-    checkOut: initialCheckOut ? new Date(initialCheckOut) : today,
+    checkIn: initialCheckIn ? startOfDay(new Date(initialCheckIn)) : startOfDay(new Date()),
+    checkOut: initialCheckOut ? startOfDay(new Date(initialCheckOut)) : startOfDay(addDays(new Date(), 1)),
     numberOfGuests: 1,
     totalAmount: 0,
     status: 'pending',
     notes: ''
   });
+
+  // Handle base price change
+  const handleBasePriceChange = useCallback(async (price: number) => {
+    if (!selectedProperty || !formData.roomType) return;
+    
+    try {
+      await updateBasePrice(selectedProperty.id, formData.roomType, price);
+    } catch (err) {
+      console.error('Error updating base price:', err);
+      setError('Failed to update pricing');
+    }
+  }, [selectedProperty, formData.roomType, updateBasePrice]);
+
+  // Handle room type selection
+  const handleRoomTypeChange = useCallback(async (roomTypeName: string) => {
+    if (!selectedProperty) return;
+
+    const roomType = selectedProperty.roomTypes.find(rt => rt.name === roomTypeName);
+    if (roomType) {
+      setFormData(prev => ({
+        ...prev,
+        roomType: roomType.name
+      }));
+
+      try {
+        await handleBasePriceChange(roomType.price);
+      } catch (err) {
+        console.error('Error updating base price:', err);
+        setError('Failed to update pricing');
+      }
+    }
+  }, [selectedProperty, handleBasePriceChange]);
+
+  // Handle property selection
+  const handlePropertyChange = useCallback(async (propertyId: string) => {
+    const property = properties.find(p => p.id === propertyId);
+    if (property) {
+      setSelectedProperty(property);
+      setFormData(prev => ({
+        ...prev,
+        propertyId,
+        propertyName: property.name,
+        roomType: '',
+        totalAmount: 0
+      }));
+      
+      try {
+        await loadDynamicPricing(propertyId);
+      } catch (err) {
+        console.error('Error loading dynamic pricing:', err);
+        setError('Failed to load pricing information');
+      }
+    }
+  }, [properties, loadDynamicPricing]);
+
+  // Handle board type selection
+  const handleBoardTypeChange = useCallback((boardType: 'room-only' | 'breakfast-included' | 'half-board' | 'full-board') => {
+    setSelectedBoardType(boardType);
+  }, []);
 
   // Load properties once
   useEffect(() => {
@@ -43,15 +110,17 @@ export const BookingFormPage: React.FC = () => {
         const data = await propertyService.getProperties();
         setProperties(data);
         
-        // If we have initialPropertyId, set initial property name and room type
+        // If we have initialPropertyId, set initial property and its dynamic pricing
         if (initialPropertyId) {
           const property = data.find(p => p.id === initialPropertyId);
           if (property) {
+            setSelectedProperty(property);
             setFormData(prev => ({
               ...prev,
-              propertyName: property.name,
-              totalAmount: property.roomTypes.find(rt => rt.name === initialRoomType)?.price || 0
+              propertyName: property.name
             }));
+            // Load dynamic pricing for the property
+            await loadDynamicPricing(initialPropertyId);
           }
         }
       } catch (err) {
@@ -61,7 +130,7 @@ export const BookingFormPage: React.FC = () => {
     };
 
     loadProperties();
-  }, []); // Empty dependency array as this should only run once
+  }, []);
 
   // Load booking data when id changes
   useEffect(() => {
@@ -107,43 +176,42 @@ export const BookingFormPage: React.FC = () => {
     };
 
     loadBooking();
-  }, [id, properties]); // Only depend on id and properties
+  }, [id, properties]);
 
-  // Memoize handlers to prevent unnecessary re-renders
-  const handlePropertyChange = useCallback((propertyId: string) => {
-    const property = properties.find(p => p.id === propertyId);
-    if (property) {
-      const firstRoomType = property.roomTypes[0];
-      setFormData(prev => ({
-        ...prev,
-        propertyId: property.id,
-        propertyName: property.name,
-        roomType: firstRoomType?.name || '',
-        totalAmount: firstRoomType?.price || 0
-      }));
+  // Handle date changes
+  const handleCheckInChange = (date: Date | null) => {
+    if (!date) return;
+    
+    const checkInDate = startOfDay(date);
+    let checkOutDate = formData.checkOut;
+    
+    // If check-out is before new check-in, set it to the next day
+    if (isBefore(checkOutDate, checkInDate)) {
+      checkOutDate = startOfDay(addDays(checkInDate, 1));
     }
-  }, [properties]);
-
-  const handleRoomTypeChange = useCallback((roomTypeName: string) => {
-    const property = properties.find(p => p.id === formData.propertyId);
-    const roomType = property?.roomTypes.find(rt => rt.name === roomTypeName);
-    if (roomType) {
-      setFormData(prev => ({
-        ...prev,
-        roomType: roomType.name,
-        totalAmount: roomType.price
-      }));
-    }
-  }, [properties, formData.propertyId]);
-
-  const handleDateChange = useCallback((field: 'checkIn' | 'checkOut', value: string) => {
-    const date = new Date(value);
+    
     setFormData(prev => ({
       ...prev,
-      [field]: date
+      checkIn: checkInDate,
+      checkOut: checkOutDate
     }));
-  }, []);
+  };
 
+  const handleCheckOutChange = (date: Date | null) => {
+    if (!date) return;
+    
+    const checkOutDate = startOfDay(date);
+    if (isBefore(checkOutDate, formData.checkIn)) {
+      return; // Don't allow check-out before check-in
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      checkOut: checkOutDate
+    }));
+  };
+
+  // Memoize handlers to prevent unnecessary re-renders
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -218,15 +286,15 @@ export const BookingFormPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">
+    <div className="max-w-4xl mx-auto py-8 px-4">
+      <h1 className="text-2xl font-bold mb-6">
         {id ? 'Edit Booking' : 'New Booking'}
       </h1>
 
       {error && (
-        <div className="mb-4 bg-red-50 text-red-800 p-4 rounded-lg flex items-center">
-          <AlertCircle className="h-5 w-5 mr-2" />
-          <span>{error}</span>
+        <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-center">
+          <AlertCircle className="w-5 h-5 mr-2" />
+          {error}
         </div>
       )}
 
@@ -237,11 +305,11 @@ export const BookingFormPage: React.FC = () => {
           <select
             value={formData.propertyId}
             onChange={(e) => handlePropertyChange(e.target.value)}
-            className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             required
           >
             <option value="">Select a property</option>
-            {properties.map(property => (
+            {properties.map((property) => (
               <option key={property.id} value={property.id}>
                 {property.name}
               </option>
@@ -250,24 +318,106 @@ export const BookingFormPage: React.FC = () => {
         </div>
 
         {/* Room Type Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Room Type</label>
-          <select
-            value={formData.roomType}
-            onChange={(e) => handleRoomTypeChange(e.target.value)}
-            className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            required
-          >
-            <option value="">Select a room type</option>
-            {properties
-              .find(p => p.id === formData.propertyId)
-              ?.roomTypes.map(roomType => (
+        {selectedProperty && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Room Type</label>
+            <select
+              value={formData.roomType}
+              onChange={(e) => handleRoomTypeChange(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            >
+              <option value="">Select a room type</option>
+              {selectedProperty.roomTypes.map((roomType) => (
                 <option key={roomType.name} value={roomType.name}>
-                  {roomType.name} - ${roomType.price}
+                  {roomType.name} - Base price: ${roomType.price}
                 </option>
               ))}
-          </select>
+            </select>
+          </div>
+        )}
+
+        {/* Board Type Selection */}
+        {selectedProperty && formData.roomType && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Board Type</label>
+            <select
+              value={selectedBoardType}
+              onChange={(e) => handleBoardTypeChange(e.target.value as any)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            >
+              <option value="room-only">Room Only</option>
+              <option value="breakfast-included">Breakfast Included (+20%)</option>
+              <option value="half-board">Half Board (+40%)</option>
+              <option value="full-board">Full Board (+60%)</option>
+            </select>
+          </div>
+        )}
+
+        {/* Base Price Input */}
+        {selectedProperty && formData.roomType && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Base Price (per night)</label>
+            <div className="mt-1 relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500 sm:text-sm">$</span>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={dynamicPricing?.roomOnly.basePrice || 0}
+                onChange={(e) => handleBasePriceChange(parseFloat(e.target.value))}
+                className="pl-7 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Dates Selection */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Check-in Date</label>
+            <DatePicker
+              selected={formData.checkIn}
+              onChange={handleCheckInChange}
+              selectsStart
+              startDate={formData.checkIn}
+              endDate={formData.checkOut}
+              minDate={today}
+              dateFormat="MM/dd/yyyy"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Check-out Date</label>
+            <DatePicker
+              selected={formData.checkOut}
+              onChange={handleCheckOutChange}
+              selectsEnd
+              startDate={formData.checkIn}
+              endDate={formData.checkOut}
+              minDate={addDays(formData.checkIn, 1)}
+              dateFormat="MM/dd/yyyy"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            />
+          </div>
         </div>
+
+        {/* Dynamic Price Calculator */}
+        {dynamicPricing && formData.propertyId && formData.roomType && (
+          <DynamicPriceCalculator
+            checkIn={formData.checkIn}
+            checkOut={formData.checkOut}
+            dynamicPricing={dynamicPricing}
+            selectedBoardType={selectedBoardType}
+            onPriceCalculated={(totalPrice: number) => setFormData(prev => ({ ...prev, totalAmount: totalPrice }))}
+            propertyId={formData.propertyId}
+          />
+        )}
 
         {/* Guest Information */}
         <div className="space-y-4">
@@ -310,32 +460,6 @@ export const BookingFormPage: React.FC = () => {
         <div className="space-y-4">
           <h2 className="text-lg font-medium text-gray-900">Booking Details</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Check-in Date</label>
-              <input
-                type="date"
-                value={format(formData.checkIn, 'yyyy-MM-dd')}
-                min={todayStr}
-                onChange={(e) => handleDateChange('checkIn', e.target.value)}
-                className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Check-out Date</label>
-              <input
-                type="date"
-                value={format(formData.checkOut, 'yyyy-MM-dd')}
-                min={format(formData.checkIn, 'yyyy-MM-dd')}
-                onChange={(e) => handleDateChange('checkOut', e.target.value)}
-                className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700">Number of Guests</label>
             <input

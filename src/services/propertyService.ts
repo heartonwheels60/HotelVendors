@@ -11,11 +11,14 @@ import {
   where,
   orderBy,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  setDoc
 } from 'firebase/firestore';
 import type { Property, PropertyFormData } from '../types/property';
+import type { DynamicPricing } from '../types/pricing';
 
 const PROPERTIES_COLLECTION = 'properties';
+const DYNAMIC_PRICING_COLLECTION = 'dynamicPricing';
 
 // Helper function to get current user ID with better error handling
 const getCurrentUserId = (): string => {
@@ -232,6 +235,90 @@ export const propertyService = {
       await deleteDoc(docRef);
     } catch (error) {
       console.error('Error deleting property:', error);
+      throw error;
+    }
+  },
+
+  async getPropertyDynamicPricing(propertyId: string) {
+    try {
+      // First get the property to access room prices
+      const propertyDoc = await getDoc(doc(db, PROPERTIES_COLLECTION, propertyId));
+      if (!propertyDoc.exists()) {
+        throw new Error('Property not found');
+      }
+      
+      const propertyData = propertyDoc.data();
+      const standardRoomPrice = propertyData.roomTypes?.[0]?.price || 100; // Default to 100 if no price found
+
+      const docRef = doc(db, DYNAMIC_PRICING_COLLECTION, propertyId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+          roomOnly: {
+            ...data.roomOnly,
+            basePrice: data.roomOnly.basePrice || standardRoomPrice
+          },
+          breakfastIncluded: data.breakfastIncluded && {
+            ...data.breakfastIncluded,
+            basePrice: data.breakfastIncluded.basePrice || (standardRoomPrice * 1.2)
+          },
+          halfBoard: data.halfBoard && {
+            ...data.halfBoard,
+            basePrice: data.halfBoard.basePrice || (standardRoomPrice * 1.4)
+          },
+          fullBoard: data.fullBoard && {
+            ...data.fullBoard,
+            basePrice: data.fullBoard.basePrice || (standardRoomPrice * 1.6)
+          }
+        };
+      }
+
+      // If no dynamic pricing exists, return default pricing based on room price
+      return {
+        roomOnly: {
+          basePrice: standardRoomPrice,
+          weekendMultiplier: 1.3,
+          specialDays: [],
+          seasonalPricing: []
+        },
+        breakfastIncluded: {
+          basePrice: standardRoomPrice * 1.2, // 20% more for breakfast
+          weekendMultiplier: 1.3,
+          specialDays: [],
+          seasonalPricing: []
+        },
+        halfBoard: {
+          basePrice: standardRoomPrice * 1.4, // 40% more for half board
+          weekendMultiplier: 1.3,
+          specialDays: [],
+          seasonalPricing: []
+        },
+        fullBoard: {
+          basePrice: standardRoomPrice * 1.6, // 60% more for full board
+          weekendMultiplier: 1.3,
+          specialDays: [],
+          seasonalPricing: []
+        }
+      };
+    } catch (error) {
+      console.error('Error getting dynamic pricing:', error);
+      throw new Error('Failed to load dynamic pricing');
+    }
+  },
+
+  async updatePropertyDynamicPricing(propertyId: string, dynamicPricing: {
+    roomOnly: DynamicPricing;
+    breakfastIncluded?: DynamicPricing;
+    halfBoard?: DynamicPricing;
+    fullBoard?: DynamicPricing;
+  }): Promise<void> {
+    try {
+      const docRef = doc(db, DYNAMIC_PRICING_COLLECTION, propertyId);
+      await setDoc(docRef, dynamicPricing);
+    } catch (error) {
+      console.error('Error updating dynamic pricing:', error);
       throw error;
     }
   }

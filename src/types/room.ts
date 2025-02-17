@@ -6,6 +6,30 @@ export type PricingOption = {
   description?: string;
 };
 
+export type PriceRule = {
+  id: string;
+  name: string;
+  type: 'seasonal' | 'special_event' | 'last_minute' | 'early_bird';
+  startDate: string;
+  endDate: string;
+  priceAdjustment: number; // percentage adjustment
+  description?: string;
+};
+
+export type DynamicPricing = {
+  basePrice: number;
+  weekendMultiplier: number;
+  specialDays: Array<{
+    date: string;
+    price: number;
+  }>;
+  seasonalPricing: Array<{
+    startDate: string;
+    endDate: string;
+    multiplier: number;
+  }>;
+};
+
 export type Amenity = {
   id: string;
   name: string;
@@ -22,7 +46,22 @@ export interface RoomDetails {
   maxOccupancy: number;
   bedConfiguration: string;
   images: string[];
+  basePrice: number;
+  weekendMultiplier: number;
   pricingOptions: PricingOption[];
+  priceRules: PriceRule[];
+  dailyPrices: {
+    [date: string]: {
+      price: number;
+      type: 'custom' | 'weekend' | 'seasonal' | 'base';
+    };
+  };
+  dynamicPricing?: {
+    roomOnly: DynamicPricing;
+    breakfastIncluded?: DynamicPricing;
+    halfBoard?: DynamicPricing;
+    fullBoard?: DynamicPricing;
+  };
   amenities: string[];
   isSmokingAllowed: boolean;
   hasBalcony: boolean;

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { RoomDetails } from '../types/room';
-import { PriceCalendar } from '../components/pricing/PriceCalendar';
+import PriceCalendar from '../components/pricing/PriceCalendar';
 
 interface SeasonalPricing {
   startDate: string;
