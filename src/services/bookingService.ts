@@ -29,12 +29,32 @@ const convertTimestamp = (timestamp: any): Date => {
   return new Date(timestamp);
 };
 
+// Helper function to determine booking status based on dates
+const determineBookingStatus = (checkIn: Date, checkOut: Date): string => {
+  const now = new Date();
+  
+  if (now > checkOut) {
+    return 'completed';
+  } else if (now >= checkIn && now <= checkOut) {
+    return 'active';
+  } else if (now < checkIn) {
+    return 'pending';
+  }
+  return 'pending';
+};
+
 // Helper function to convert Firestore data to Booking type
 const convertBookingData = (docData: DocumentData, id: string): Booking => {
   const checkIn = docData.checkIn ? convertTimestamp(docData.checkIn) : new Date();
   const checkOut = docData.checkOut ? convertTimestamp(docData.checkOut) : new Date();
   const createdAt = docData.createdAt ? convertTimestamp(docData.createdAt) : new Date();
   const updatedAt = docData.updatedAt ? convertTimestamp(docData.updatedAt) : new Date();
+
+  // Determine the current status based on dates
+  const currentStatus = determineBookingStatus(checkIn, checkOut);
+  
+  // Only update status if it's not cancelled
+  const status = docData.status === 'cancelled' ? 'cancelled' : currentStatus;
 
   return {
     id,
@@ -51,7 +71,7 @@ const convertBookingData = (docData: DocumentData, id: string): Booking => {
     checkOut,
     numberOfGuests: docData.numberOfGuests || 1,
     totalAmount: docData.totalAmount || 0,
-    status: docData.status || 'pending',
+    status,
     notes: docData.notes || '',
     createdAt,
     updatedAt,
@@ -123,7 +143,7 @@ export const bookingService = {
     try {
       const userId = getCurrentUserId();
       
-      // Simplified query without ordering until index is created
+      // Query bookings where user is either the owner or the creator
       const q = query(
         collection(db, BOOKINGS_COLLECTION),
         where('userId', '==', userId)
@@ -131,26 +151,13 @@ export const bookingService = {
       
       const querySnapshot = await getDocs(q);
       
-      // Convert and sort on client side
-      return querySnapshot.docs
-        .map(doc => convertBookingData(doc.data(), doc.id))
-        .sort((a, b) => {
-          const dateA = a.createdAt?.getTime() || 0;
-          const dateB = b.createdAt?.getTime() || 0;
-          return dateB - dateA;
-        });
-    } catch (error: any) {
-      console.error('Error getting bookings:', error);
+      const bookings = querySnapshot.docs.map(doc => convertBookingData(doc.data(), doc.id));
       
-      if (error.message === 'Please log in to continue') {
-        throw new Error('Please log in to view your bookings');
-      }
-      
-      if (error.code === 'permission-denied') {
-        throw new Error('You do not have permission to access these bookings');
-      }
-
-      throw new Error('Failed to load bookings. Please try again.');
+      // Sort bookings by check-in date, most recent first
+      return bookings.sort((a, b) => b.checkIn.getTime() - a.checkIn.getTime());
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+      throw new Error('Failed to fetch bookings. Please try again.');
     }
   },
 

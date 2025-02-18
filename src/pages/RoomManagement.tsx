@@ -1,15 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import RoomSelector from '../components/rooms/RoomSelector';
-import PriceRules from '../components/pricing/PriceRules';
-import { createTestRoom } from '../utils/createTestRoom';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from '../components/icons/ArrowRight';
+import { Check } from '../components/icons/Check';
+import { Plus } from '../components/icons/Plus';
+import { useAuth } from '../contexts/AuthContext';
+import RoomCard from '../components/rooms/RoomCard';
+import AddRoomModal from '../components/rooms/AddRoomModal';
 
 const RoomManagement: React.FC = () => {
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [roomDetails, setRoomDetails] = useState<any>(null);
-  const [isCreatingTestRoom, setIsCreatingTestRoom] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAddRoomModal, setShowAddRoomModal] = useState(false);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    fetchRooms();
+  }, [user]);
+
+  const fetchRooms = async () => {
+    if (!user) return;
+    
+    try {
+      const roomsRef = collection(db, 'rooms');
+      const q = query(roomsRef, where('ownerId', '==', user.uid));
+      const querySnapshot = await getDocs(q);
+      const roomsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRooms(roomsData);
+    } catch (error) {
+      console.error('Error fetching rooms:', error);
+      setError('Failed to fetch rooms');
+    }
+  };
 
   useEffect(() => {
     if (selectedRoomId) {
@@ -34,98 +63,79 @@ const RoomManagement: React.FC = () => {
     }
   };
 
-  const handleCreateTestRoom = async () => {
+  const handleAddRoom = async (roomData: any) => {
     try {
-      setIsCreatingTestRoom(true);
-      setError(null);
-      const roomId = await createTestRoom();
-      setSelectedRoomId(roomId);
+      const roomsRef = collection(db, 'rooms');
+      await addDoc(roomsRef, {
+        ...roomData,
+        ownerId: user?.uid,
+        createdAt: new Date()
+      });
+      setShowAddRoomModal(false);
+      fetchRooms();
     } catch (error) {
-      console.error('Error creating test room:', error);
-      setError('Failed to create test room');
-    } finally {
-      setIsCreatingTestRoom(false);
+      console.error('Error adding room:', error);
+      setError('Failed to add room');
+    }
+  };
+
+  const handleEditRoom = (room: any) => {
+    setSelectedRoomId(room.id);
+    setShowAddRoomModal(true);
+  };
+
+  const handleDeleteRoom = async (roomId: string) => {
+    if (!window.confirm('Are you sure you want to delete this room?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'rooms', roomId));
+      fetchRooms();
+    } catch (error) {
+      console.error('Error deleting room:', error);
+      setError('Failed to delete room');
     }
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-8">Room Pricing Management</h1>
-
-      <div className="grid grid-cols-1 gap-8">
-        {/* Room Selection Section */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Select Room</h2>
-            <button
-              onClick={handleCreateTestRoom}
-              disabled={isCreatingTestRoom}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
-            >
-              {isCreatingTestRoom ? 'Creating...' : 'Create Test Room'}
-            </button>
-          </div>
-          <RoomSelector
-            selectedRoomId={selectedRoomId}
-            onRoomSelect={setSelectedRoomId}
-          />
-        </div>
-
-        {/* Room Details and Pricing Section */}
-        {selectedRoomId && roomDetails && (
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold mb-4">{roomDetails.name || 'Test Room'}</h2>
-              
-              {/* Base Price Section */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium mb-2">Base Price (per night)</h3>
-                <div className="flex items-center">
-                  <span className="text-gray-500 mr-2">$</span>
-                  <input
-                    type="number"
-                    value={roomDetails.basePrice || 100}
-                    className="border rounded p-2 w-32"
-                    disabled
-                  />
-                </div>
-              </div>
-
-              {/* Weekend Multiplier Section */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium mb-2">Weekend Price Multiplier</h3>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    value={roomDetails.weekendMultiplier || 1.2}
-                    step="0.1"
-                    className="border rounded p-2 w-32"
-                    disabled
-                  />
-                </div>
-                <p className="text-sm text-gray-600 mt-1">
-                  Weekend price: ${((roomDetails.basePrice || 100) * (roomDetails.weekendMultiplier || 1.2)).toFixed(2)}
-                </p>
-              </div>
-
-              {/* Pricing Rules Section */}
-              <div>
-                <h3 className="text-lg font-medium mb-4">Seasonal Pricing</h3>
-                <PriceRules
-                  roomId={selectedRoomId}
-                  onRuleChange={fetchRoomDetails}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 text-red-700 p-4 rounded-lg">
-            {error}
-          </div>
-        )}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Room Management</h1>
+        <button
+          onClick={() => setShowAddRoomModal(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <Plus className="h-5 w-5 mr-2" />
+          Add Room
+        </button>
       </div>
+
+      {/* Room Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {rooms.map((room) => (
+          <RoomCard
+            key={room.id}
+            room={room}
+            onEdit={() => handleEditRoom(room)}
+            onDelete={() => handleDeleteRoom(room.id)}
+          />
+        ))}
+      </div>
+
+      {/* Add/Edit Room Modal */}
+      {showAddRoomModal && (
+        <AddRoomModal
+          isOpen={showAddRoomModal}
+          onClose={() => setShowAddRoomModal(false)}
+          onSubmit={handleAddRoom}
+          initialData={rooms.find(room => room.id === selectedRoomId)}
+        />
+      )}
+
+      {error && (
+        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md">
+          {error}
+        </div>
+      )}
     </div>
   );
 };

@@ -19,6 +19,7 @@ import { StaffPage } from './pages/StaffPage';
 import { StaffFormPage } from './pages/StaffFormPage';
 import { StaffSchedulePage } from './pages/StaffSchedulePage';
 import { PricingPage } from './pages/PricingPage';
+import { ReportsPage } from './pages/ReportsPage';
 import Dashboard from './pages/Dashboard';
 import RoomManagement from './pages/RoomManagement';
 import NotFound from './pages/NotFound';
@@ -52,27 +53,19 @@ function App() {
                   } />
                   <Route path="/hotels" element={<HotelsPage />} />
                   <Route path="/hotels/new" element={<HotelFormPage />} />
-                  <Route path="/hotels/edit/:id" element={<HotelFormPage />} />
-                  <Route path="/pricing" element={
-                    <Suspense fallback={<LoadingSpinner />}>
-                      <PricingPage />
-                    </Suspense>
-                  } />
-                  <Route path="/rooms" element={
-                    <Suspense fallback={<LoadingSpinner />}>
-                      <RoomManagement />
-                    </Suspense>
-                  } />
+                  <Route path="/hotels/:id/edit" element={<HotelFormPage />} />
                   <Route path="/bookings" element={<BookingsPage />} />
                   <Route path="/bookings/new" element={<BookingFormPage />} />
-                  <Route path="/bookings/edit/:id" element={<BookingFormPage />} />
-                  <Route path="/bookings/calendar" element={<BookingCalendarPage />} />
+                  <Route path="/bookings/:id/edit" element={<BookingFormPage />} />
+                  <Route path="/calendar" element={<BookingCalendarPage />} />
                   <Route path="/reviews" element={<ReviewsPage />} />
-                  <Route path="/reviews/new/:bookingId" element={<ReviewFormPage />} />
+                  <Route path="/reviews/new" element={<ReviewFormPage />} />
                   <Route path="/staff" element={<StaffPage />} />
                   <Route path="/staff/new" element={<StaffFormPage />} />
-                  <Route path="/staff/edit/:id" element={<StaffFormPage />} />
                   <Route path="/staff/schedule" element={<StaffSchedulePage />} />
+                  <Route path="/pricing" element={<PricingPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/rooms" element={<RoomManagement />} />
                   {/* Catch-all route for 404 */}
                   <Route path="*" element={
                     <Suspense fallback={<LoadingSpinner />}>

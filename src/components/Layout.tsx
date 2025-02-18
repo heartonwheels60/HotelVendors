@@ -10,7 +10,8 @@ import {
   BarChart3,
   Menu as MenuIcon,
   X,
-  LogOut
+  LogOut,
+  Home
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -22,6 +23,7 @@ const menuItems = [
   { path: '/reviews', icon: <MessageSquare className="w-6 h-6" />, label: 'Reviews' },
   { path: '/staff', icon: <Users className="w-6 h-6" />, label: 'Staff' },
   { path: '/reports', icon: <BarChart3 className="w-6 h-6" />, label: 'Reports' },
+  { path: '/rooms', icon: <Home className="w-6 h-6" />, label: 'Rooms' },
 ];
 
 export const Layout: React.FC = () => {

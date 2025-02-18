@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { RoomDetails } from '../types/room';
 import PriceCalendar from '../components/pricing/PriceCalendar';
@@ -30,37 +30,6 @@ export const PricingPage: React.FC = () => {
     description: ''
   });
 
-  const createTestRoom = async () => {
-    if (!user) return;
-
-    try {
-      console.log('Creating test room...');
-      const roomsRef = collection(db, 'rooms');
-      const testRoom = {
-        name: 'Test Room',
-        type: 'standard',
-        description: 'A test room for pricing',
-        ownerId: user.uid,
-        pricingOptions: [
-          {
-            type: 'room-only',
-            price: 100
-          }
-        ],
-        weekendMultiplier: 1.2,
-        seasonalPricing: [],
-        dailyPrices: {},
-        status: 'active'
-      };
-
-      const docRef = await addDoc(roomsRef, testRoom);
-      console.log('Test room created with ID:', docRef.id);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating test room:', error);
-    }
-  };
-
   useEffect(() => {
     const fetchRooms = async () => {
       if (!user) {
@@ -76,29 +45,6 @@ export const PricingPage: React.FC = () => {
         
         console.log('Found rooms:', querySnapshot.size);
         
-        // If no rooms exist, create a test room
-        if (querySnapshot.empty) {
-          console.log('No rooms found, creating test room...');
-          await createTestRoom();
-          // Fetch rooms again after creating test room
-          const newQuerySnapshot = await getDocs(q);
-          const roomsData = newQuerySnapshot.docs.map(doc => {
-            const data = doc.data();
-            console.log('Room data:', data);
-            return {
-              id: doc.id,
-              ...data,
-              basePrice: data.pricingOptions?.[0]?.price || 0,
-              weekendMultiplier: data.weekendMultiplier || 1.2,
-              seasonalPricing: data.seasonalPricing || []
-            };
-          }) as RoomPricing[];
-          
-          console.log('Processed rooms data:', roomsData);
-          setRooms(roomsData);
-          return;
-        }
-
         const roomsData = querySnapshot.docs.map(doc => {
           const data = doc.data();
           console.log('Room data:', data);
