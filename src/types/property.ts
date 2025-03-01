@@ -1,9 +1,33 @@
 export type RoomTypeName = 'Standard Room' | 'Deluxe Room' | 'Suite';
 
+export interface SeasonalPricing {
+  startDate: string;
+  endDate: string;
+  multiplier: number;
+  description: string;
+}
+
+export interface DailyPrice {
+  price: number;
+  type: 'custom' | 'seasonal' | 'weekend' | 'base';
+}
+
+export interface PriceHistory {
+  startDate: string;
+  endDate: string;
+  price: number;
+  type: 'weekend' | 'seasonal' | 'custom';
+  description?: string;
+}
+
 export interface RoomType {
   name: RoomTypeName;
   price: number;
   numberOfRooms: number;
+  weekendMultiplier: number;
+  seasonalPricing: SeasonalPricing[];
+  priceHistory: PriceHistory[];
+  dailyPrices?: { [date: string]: DailyPrice };
 }
 
 export interface Property {
@@ -21,9 +45,5 @@ export interface Property {
 }
 
 export interface PropertyFormData extends Omit<Property, 'id' | 'userId' | 'createdAt' | 'updatedAt'> {
-  roomTypes: Array<{
-    name: RoomTypeName;
-    price: number;
-    numberOfRooms: number;
-  }>;
+  roomTypes: Array<RoomType>;
 }

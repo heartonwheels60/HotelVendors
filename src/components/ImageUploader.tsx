@@ -12,7 +12,7 @@ interface ImageUploaderProps {
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   images,
   onImagesChange,
-  maxImages = 5,
+  maxImages = 30,
   folder
 }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -40,6 +40,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       const uploadedUrls = await storageService.uploadMultipleImages(files, folder);
       onImagesChange([...images, ...uploadedUrls]);
+      
+      // Clear the input value to allow uploading the same file again
+      const input = e.target as HTMLInputElement;
+      input.value = '';
     } catch (err) {
       console.error('Error uploading images:', err);
       setError('Failed to upload images');
@@ -71,7 +75,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <p className="mb-2 text-sm text-gray-500">
               <span className="font-semibold">Click to upload</span> or drag and drop
             </p>
-            <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+            <p className="text-xs text-gray-500">
+              PNG, JPG, GIF up to 10MB ({images.length}/{maxImages} images)
+            </p>
           </div>
           <input
             type="file"
@@ -101,7 +107,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <div className="aspect-w-16 aspect-h-9">
               <img
                 src={image}
-                alt={`Property image ${index + 1}`}
+                alt={`Uploaded image ${index + 1}`}
                 className="object-cover rounded-lg"
               />
             </div>
@@ -113,21 +119,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             </button>
           </div>
         ))}
-
-        {/* Empty State */}
-        {images.length === 0 && (
-          <div className="flex items-center justify-center h-32 bg-gray-100 rounded-lg">
-            <div className="text-center text-gray-500">
-              <ImageIcon className="w-8 h-8 mx-auto mb-2" />
-              <p className="text-sm">No images uploaded</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Image Count */}
-      <div className="text-sm text-gray-500">
-        {images.length} of {maxImages} images uploaded
       </div>
     </div>
   );

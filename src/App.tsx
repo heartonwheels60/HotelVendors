@@ -21,7 +21,6 @@ import { StaffSchedulePage } from './pages/StaffSchedulePage';
 import { PricingPage } from './pages/PricingPage';
 import { ReportsPage } from './pages/ReportsPage';
 import Dashboard from './pages/Dashboard';
-import RoomManagement from './pages/RoomManagement';
 import NotFound from './pages/NotFound';
 
 // Loading component
@@ -65,7 +64,6 @@ function App() {
                   <Route path="/staff/schedule" element={<StaffSchedulePage />} />
                   <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/reports" element={<ReportsPage />} />
-                  <Route path="/rooms" element={<RoomManagement />} />
                   {/* Catch-all route for 404 */}
                   <Route path="*" element={
                     <Suspense fallback={<LoadingSpinner />}>

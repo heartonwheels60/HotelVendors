@@ -29,6 +29,14 @@ service cloud.firestore {
       );
     }
 
+    // Rooms collection
+    match /rooms/{roomId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid
+      );
+    }
+
     // Users collection
     match /users/{userId} {
       allow create: if isAuthenticated() && request.auth.uid == userId;

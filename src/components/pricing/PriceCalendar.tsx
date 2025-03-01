@@ -2,16 +2,20 @@ import React, { useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { doc, updateDoc, getDoc, deleteField } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { format, parseISO, startOfDay } from 'date-fns';
-import { TrashIcon } from '@heroicons/react/24/outline';
+import { format, parseISO, startOfDay, isWithinInterval } from 'date-fns';
 
 interface PriceCalendarProps {
   roomId: string;
   basePrice: number;
   weekendMultiplier: number;
-  seasonalPricing: any[];
+  seasonalPricing: Array<{
+    startDate: string;
+    endDate: string;
+    multiplier: number;
+    description: string;
+  }>;
   onPriceUpdate: () => void;
 }
 
@@ -19,6 +23,7 @@ interface DailyPrice {
   date: string;
   price: number;
   type: 'custom' | 'weekend' | 'seasonal' | 'base';
+  description?: string;
 }
 
 const PriceCalendar: React.FC<PriceCalendarProps> = ({
@@ -36,16 +41,21 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
 
+  const [propertyId, roomTypeName] = roomId.split('_');
+
   const getDailyPrices = async () => {
     try {
-      const roomRef = doc(db, 'rooms', roomId);
-      const roomDoc = await getDoc(roomRef);
+      const propertyRef = doc(db, 'properties', propertyId);
+      const propertyDoc = await getDoc(propertyRef);
       
-      if (!roomDoc.exists()) {
-        throw new Error('Room not found');
+      if (!propertyDoc.exists()) {
+        throw new Error('Property not found');
       }
       
-      return roomDoc.data()?.dailyPrices || {};
+      const property = propertyDoc.data();
+      const roomType = property.roomTypes.find((rt: any) => rt.name === roomTypeName);
+      
+      return roomType?.dailyPrices || {};
     } catch (error) {
       console.error('Error fetching daily prices:', error);
       throw error;
@@ -65,6 +75,21 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
     }
   };
 
+  const getSeasonalPrice = (date: Date): { price: number; description: string } | null => {
+    for (const season of seasonalPricing) {
+      const startDate = parseISO(season.startDate);
+      const endDate = parseISO(season.endDate);
+      
+      if (isWithinInterval(date, { start: startDate, end: endDate })) {
+        return {
+          price: basePrice * season.multiplier,
+          description: season.description
+        };
+      }
+    }
+    return null;
+  };
+
   const loadEvents = async () => {
     setLoading(true);
     setError(null);
@@ -81,29 +106,60 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
       for (let date = new Date(now); date <= endDate; date.setDate(date.getDate() + 1)) {
         const dateStr = format(date, 'yyyy-MM-dd');
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        const currentDate = startOfDay(new Date());
         
         if (dailyPrices[dateStr]) {
+          // Custom price takes precedence
           events.push({
             title: `$${dailyPrices[dateStr].price}`,
             date: dateStr,
             backgroundColor: getEventColor('custom'),
-            extendedProps: { type: 'custom', price: dailyPrices[dateStr].price }
-          });
-        } else if (isWeekend) {
-          const weekendPrice = Math.round(basePrice * weekendMultiplier);
-          events.push({
-            title: `$${weekendPrice}`,
-            date: dateStr,
-            backgroundColor: getEventColor('weekend'),
-            extendedProps: { type: 'weekend', price: weekendPrice }
+            extendedProps: { 
+              type: 'custom', 
+              price: dailyPrices[dateStr].price,
+              description: 'Custom Price'
+            }
           });
         } else {
-          events.push({
-            title: `$${basePrice}`,
-            date: dateStr,
-            backgroundColor: getEventColor('base'),
-            extendedProps: { type: 'base', price: basePrice }
-          });
+          // Check for seasonal pricing
+          const seasonalPrice = getSeasonalPrice(date);
+          if (seasonalPrice) {
+            events.push({
+              title: `$${seasonalPrice.price}`,
+              date: dateStr,
+              backgroundColor: getEventColor('seasonal'),
+              extendedProps: { 
+                type: 'seasonal', 
+                price: seasonalPrice.price,
+                description: seasonalPrice.description
+              }
+            });
+          } else if (isWeekend && date >= currentDate) {
+            // Weekend pricing if no seasonal price and date is not in the past
+            const weekendPrice = Math.round(basePrice * weekendMultiplier);
+            events.push({
+              title: `$${weekendPrice}`,
+              date: dateStr,
+              backgroundColor: getEventColor('weekend'),
+              extendedProps: { 
+                type: 'weekend', 
+                price: weekendPrice,
+                description: 'Weekend Price'
+              }
+            });
+          } else {
+            // Base price if no other rules apply
+            events.push({
+              title: `$${basePrice}`,
+              date: dateStr,
+              backgroundColor: getEventColor('base'),
+              extendedProps: { 
+                type: 'base', 
+                price: basePrice,
+                description: 'Base Price'
+              }
+            });
+          }
         }
       }
 
@@ -118,28 +174,15 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
   };
 
   useEffect(() => {
-    if (roomId) {
-      loadEvents();
-    }
-  }, [roomId, basePrice, weekendMultiplier]);
+    loadEvents();
+  }, [roomId, basePrice, weekendMultiplier, seasonalPricing]);
 
-  const handleDateClick = async (info: { dateStr: string }) => {
+  const handleDateClick = (arg: any) => {
     setError(null);
     
     try {
-      // Ensure the date is in the correct format
-      const clickedDate = format(parseISO(info.dateStr), 'yyyy-MM-dd');
-      
-      // Don't allow selecting dates in the past
-      if (new Date(clickedDate) < startOfDay(new Date())) {
-        setError('Cannot modify prices for past dates');
-        return;
-      }
-      
-      setSelectedDate(clickedDate);
-      const dailyPrices = await getDailyPrices();
-      const currentPrice = dailyPrices[clickedDate]?.price || basePrice;
-      setCustomPrice(currentPrice);
+      setSelectedDate(arg.dateStr);
+      setCustomPrice(arg.event?.extendedProps?.price || basePrice);
       setShowPriceModal(true);
     } catch (error) {
       console.error('Error handling date click:', error);
@@ -147,7 +190,7 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
     }
   };
 
-  const handlePriceSubmit = async () => {
+  const handlePriceUpdate = async () => {
     if (!selectedDate) return;
     if (customPrice < 0) {
       setError('Price cannot be negative');
@@ -158,12 +201,43 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
     setError(null);
 
     try {
-      const roomRef = doc(db, 'rooms', roomId);
-      await updateDoc(roomRef, {
-        [`dailyPrices.${selectedDate}`]: {
-          price: customPrice,
-          type: 'custom'
+      const propertyRef = doc(db, 'properties', propertyId);
+      const propertyDoc = await getDoc(propertyRef);
+      
+      if (!propertyDoc.exists()) {
+        throw new Error('Property not found');
+      }
+      
+      const property = propertyDoc.data();
+      const roomTypeIndex = property.roomTypes.findIndex((rt: any) => rt.name === roomTypeName);
+      
+      if (roomTypeIndex === -1) {
+        throw new Error('Room type not found');
+      }
+      
+      const updatedRoomTypes = [...property.roomTypes];
+      
+      // Get the current daily prices or initialize an empty object
+      const dailyPrices = updatedRoomTypes[roomTypeIndex].dailyPrices || {};
+      
+      // Check if this date has seasonal pricing
+      const date = new Date(selectedDate);
+      const seasonalPrice = getSeasonalPrice(date);
+      
+      // Update the daily prices
+      updatedRoomTypes[roomTypeIndex] = {
+        ...updatedRoomTypes[roomTypeIndex],
+        dailyPrices: {
+          ...dailyPrices,
+          [selectedDate]: {
+            price: customPrice,
+            type: seasonalPrice ? 'seasonal' : 'custom'
+          }
         }
+      };
+
+      await updateDoc(propertyRef, {
+        roomTypes: updatedRoomTypes
       });
 
       setShowPriceModal(false);
@@ -185,9 +259,31 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
     setError(null);
 
     try {
-      const roomRef = doc(db, 'rooms', roomId);
-      await updateDoc(roomRef, {
-        [`dailyPrices.${selectedDate}`]: deleteField()
+      const propertyRef = doc(db, 'properties', propertyId);
+      const propertyDoc = await getDoc(propertyRef);
+      
+      if (!propertyDoc.exists()) {
+        throw new Error('Property not found');
+      }
+      
+      const property = propertyDoc.data();
+      const roomTypeIndex = property.roomTypes.findIndex((rt: any) => rt.name === roomTypeName);
+      
+      if (roomTypeIndex === -1) {
+        throw new Error('Room type not found');
+      }
+      
+      const updatedRoomTypes = [...property.roomTypes];
+      updatedRoomTypes[roomTypeIndex] = {
+        ...updatedRoomTypes[roomTypeIndex],
+        dailyPrices: {
+          ...(updatedRoomTypes[roomTypeIndex].dailyPrices || {}),
+          [selectedDate]: deleteField()
+        }
+      };
+
+      await updateDoc(propertyRef, {
+        roomTypes: updatedRoomTypes
       });
 
       setShowPriceModal(false);
@@ -231,9 +327,16 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
       <FullCalendar
         plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
-        dateClick={handleDateClick}
         events={calendarEvents}
-        height="auto"
+        eventClick={handleDateClick}
+        eventContent={(arg) => {
+          return (
+            <div className="text-xs p-1">
+              <div>{arg.event.title}</div>
+              <div className="text-xs opacity-75">{arg.event.extendedProps.description}</div>
+            </div>
+          );
+        }}
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
@@ -241,75 +344,47 @@ const PriceCalendar: React.FC<PriceCalendarProps> = ({
         }}
       />
 
-      {/* Price Modal */}
+      {/* Price Update Modal */}
       {showPriceModal && selectedDate && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
-            <div className="mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                Set Price for {format(parseISO(selectedDate), 'MMMM d, yyyy')}
-              </h3>
-              <p className="text-sm text-gray-500">
-                Set a custom price for this date. Leave empty to use the default price.
-              </p>
-            </div>
-
-            <div className="mb-8">
-              <label className="block text-lg font-medium text-gray-700 mb-3">
-                Price per Night
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h3 className="text-lg font-medium mb-4">
+              Update Price for {new Date(selectedDate).toLocaleDateString()}
+            </h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Price
               </label>
-              <div className="relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 text-lg">$</span>
-                </div>
+              <div className="flex items-center">
+                <span className="text-gray-500 mr-2">$</span>
                 <input
                   type="number"
                   value={customPrice}
                   onChange={(e) => setCustomPrice(Number(e.target.value))}
-                  className="block w-full pl-10 pr-4 py-4 text-xl border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter price"
-                  min="0"
+                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                 />
               </div>
-              <div className="mt-2 flex items-center space-x-2">
-                <span className="text-sm text-gray-500">Base price: ${basePrice}</span>
-                {basePrice !== customPrice && (
-                  <span className="text-sm text-indigo-600">
-                    {customPrice > basePrice 
-                      ? `(+${((customPrice - basePrice) / basePrice * 100).toFixed(0)}%)`
-                      : `(-${((basePrice - customPrice) / basePrice * 100).toFixed(0)}%)`
-                    }
-                  </span>
-                )}
-              </div>
             </div>
-
-            <div className="flex flex-col space-y-3">
+            <div className="flex justify-end space-x-3">
               <button
-                onClick={handlePriceSubmit}
-                disabled={updating}
-                className="w-full inline-flex justify-center items-center px-6 py-4 border border-transparent text-lg font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-50"
+                onClick={() => setShowPriceModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
-                {updating ? 'Saving...' : 'Save Price'}
+                Cancel
+              </button>
+              <button
+                onClick={handlePriceUpdate}
+                disabled={updating}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700"
+              >
+                {updating ? 'Saving...' : 'Update Price'}
               </button>
               <button
                 onClick={handleDeletePrice}
                 disabled={updating}
-                className="w-full inline-flex justify-center items-center px-6 py-4 border border-red-300 text-lg font-medium rounded-lg text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50"
               >
-                <TrashIcon className="w-5 h-5 mr-2" />
                 {updating ? 'Deleting...' : 'Delete Custom Price'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowPriceModal(false);
-                  setSelectedDate(null);
-                  setError(null);
-                }}
-                disabled={updating}
-                className="w-full inline-flex justify-center items-center px-6 py-4 border border-gray-300 text-lg font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors disabled:opacity-50"
-              >
-                Cancel
               </button>
             </div>
           </div>

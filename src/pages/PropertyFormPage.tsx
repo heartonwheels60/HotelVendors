@@ -7,11 +7,17 @@ import { AlertCircle } from 'lucide-react';
 import { ImageUploader } from '../components/ImageUploader';
 
 const ROOM_TYPES = [
-  { value: 'single', label: 'Single Room' },
-  { value: 'double', label: 'Double Room' },
-  { value: 'suite', label: 'Suite' },
-  { value: 'deluxe', label: 'Deluxe Room' }
+  { value: 'Standard Room', label: 'Standard Room' },
+  { value: 'Deluxe Room', label: 'Deluxe Room' },
+  { value: 'Suite', label: 'Suite' }
 ] as const;
+
+interface RoomTypeFormState {
+  name: RoomTypeName;
+  price: number;
+  numberOfRooms: number;
+  weekendMultiplier: number;
+}
 
 export const HotelFormPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,10 +36,11 @@ export const HotelFormPage: React.FC = () => {
   });
 
   // Room type form state
-  const [roomTypeForm, setRoomTypeForm] = useState({
+  const [roomTypeForm, setRoomTypeForm] = useState<RoomTypeFormState>({
     name: ROOM_TYPES[0].value,
     price: 0,
-    numberOfRooms: 1
+    numberOfRooms: 1,
+    weekendMultiplier: 1.2
   });
 
   useEffect(() => {
@@ -92,12 +99,19 @@ export const HotelFormPage: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         roomTypes: [...prev.roomTypes, {
-          name: roomTypeForm.name as RoomTypeName,
+          name: roomTypeForm.name,
           price: roomTypeForm.price,
-          numberOfRooms: roomTypeForm.numberOfRooms
+          numberOfRooms: roomTypeForm.numberOfRooms,
+          weekendMultiplier: roomTypeForm.weekendMultiplier,
+          seasonalPricing: []
         }]
       }));
-      setRoomTypeForm({ name: ROOM_TYPES[0].value, price: 0, numberOfRooms: 1 });
+      setRoomTypeForm({
+        name: ROOM_TYPES[0].value,
+        price: 0,
+        numberOfRooms: 1,
+        weekendMultiplier: 1.2
+      });
     }
   };
 
@@ -174,14 +188,16 @@ export const HotelFormPage: React.FC = () => {
         </div>
 
         {/* Images */}
-        <div className="space-y-2">
+        <div>
           <label className="block text-sm font-medium text-gray-700">Hotel Images</label>
-          <ImageUploader
-            images={formData.images}
-            onImagesChange={(newImages) => setFormData(prev => ({ ...prev, images: newImages }))}
-            maxImages={5}
-            folder={`hotels/${formData.name.toLowerCase().replace(/\s+/g, '-')}`}
-          />
+          <div className="mt-1">
+            <ImageUploader
+              images={formData.images}
+              onImagesChange={(images) => setFormData(prev => ({ ...prev, images }))}
+              maxImages={30}
+              folder={`properties/${id || 'new'}`}
+            />
+          </div>
         </div>
 
         {/* Room Types */}
@@ -196,6 +212,9 @@ export const HotelFormPage: React.FC = () => {
                   <span className="font-medium">{roomType.name}</span>
                   <span className="text-gray-500 ml-2">
                     ${roomType.price} per night · {roomType.numberOfRooms} rooms
+                  </span>
+                  <span className="text-gray-500 ml-2">
+                    Weekend: {(roomType.weekendMultiplier || 1.2).toFixed(1)}x
                   </span>
                 </div>
                 <button
@@ -216,14 +235,14 @@ export const HotelFormPage: React.FC = () => {
 
           {/* Add Room Type Form */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Room Type
                 </label>
                 <select
                   value={roomTypeForm.name}
-                  onChange={(e) => setRoomTypeForm(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => setRoomTypeForm(prev => ({ ...prev, name: e.target.value as RoomTypeName }))}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
                   {ROOM_TYPES.map(type => (
@@ -256,6 +275,20 @@ export const HotelFormPage: React.FC = () => {
                   min="1"
                   value={roomTypeForm.numberOfRooms}
                   onChange={(e) => setRoomTypeForm(prev => ({ ...prev, numberOfRooms: Math.max(1, Number(e.target.value)) }))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Weekend Multiplier
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  value={roomTypeForm.weekendMultiplier}
+                  onChange={(e) => setRoomTypeForm(prev => ({ ...prev, weekendMultiplier: Number(e.target.value) }))}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
@@ -304,3 +337,5 @@ export const HotelFormPage: React.FC = () => {
     </div>
   );
 };
+
+export default HotelFormPage;

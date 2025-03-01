@@ -8,17 +8,6 @@ export interface Booking {
   totalAmount: number;
 }
 
-export interface Room {
-  id: string;
-  type: string;
-  size: number;
-  bedType: string;
-  view: string;
-  amenities: string[];
-  basePrice: number;
-  available: boolean;
-}
-
 export interface Review {
   id: string;
   guestName: string;

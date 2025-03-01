@@ -11,7 +11,7 @@ interface ImageUploadProps {
 export const ImageUpload: React.FC<ImageUploadProps> = ({
   images,
   onChange,
-  maxImages = 5
+  maxImages = 30
 }) => {
   const [isUploading, setIsUploading] = useState(false);
 
@@ -29,6 +29,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       console.error('Error uploading images:', error);
     } finally {
       setIsUploading(false);
+      // Clear the input value to allow uploading the same file again
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (input) input.value = '';
     }
   };
 

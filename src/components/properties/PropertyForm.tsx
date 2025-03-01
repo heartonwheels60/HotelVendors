@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
-import { ImageUpload } from '@/components/ui/ImageUpload';
+import { ImageUploader } from '@/components/ui/ImageUploader';
 import { AmenityManager } from '@/components/amenities/AmenityManager';
 
 interface PropertyFormProps {
@@ -15,6 +15,9 @@ interface PropertyFormProps {
 }
 
 const ROOM_TYPES = ['Standard Room', 'Deluxe Room', 'Suite'] as const;
+
+const MAX_IMAGES = 30;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export const PropertyForm: React.FC<PropertyFormProps> = ({
   initialData,
@@ -38,6 +41,8 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -52,10 +57,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setErrors(prev => ({ ...prev, [name]: '' }));
-  };
-
-  const handleImagesChange = (images: string[]) => {
-    setFormData(prev => ({ ...prev, images }));
   };
 
   const handleAmenitiesChange = (amenities: string[]) => {
@@ -113,6 +114,10 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     }));
   };
 
+  const handleImagesChange = (images: string[]) => {
+    setFormData(prev => ({ ...prev, images }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -132,7 +137,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-8 divide-y divide-gray-200">
       <div>
         <label className="block text-sm font-medium text-gray-700">Name</label>
         <Input
@@ -166,11 +171,12 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Images</label>
-        <ImageUpload
+        <label className="block text-sm font-medium text-gray-700">Hotel Images</label>
+        <ImageUploader
           images={formData.images}
-          onChange={handleImagesChange}
-          maxImages={5}
+          onImagesChange={handleImagesChange}
+          maxImages={30}
+          folder={`properties/${user?.uid || 'temp'}`}
         />
       </div>
 
