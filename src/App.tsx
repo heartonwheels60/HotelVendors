@@ -9,7 +9,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { HotelsPage } from './pages/PropertiesPage';
-import { HotelFormPage } from './pages/PropertyFormPage';
+import { PropertyFormPage } from './pages/PropertyFormPage';
 import { BookingsPage } from './pages/BookingsPage';
 import { BookingFormPage } from './pages/BookingFormPage';
 import { BookingCalendarPage } from './pages/BookingCalendarPage';
@@ -51,8 +51,8 @@ function App() {
                     </Suspense>
                   } />
                   <Route path="/hotels" element={<HotelsPage />} />
-                  <Route path="/hotels/new" element={<HotelFormPage />} />
-                  <Route path="/hotels/:id/edit" element={<HotelFormPage />} />
+                  <Route path="/hotels/new" element={<PropertyFormPage />} />
+                  <Route path="/hotels/:id/edit" element={<PropertyFormPage />} />
                   <Route path="/bookings" element={<BookingsPage />} />
                   <Route path="/bookings/new" element={<BookingFormPage />} />
                   <Route path="/bookings/:id/edit" element={<BookingFormPage />} />

@@ -19,7 +19,7 @@ interface RoomTypeFormState {
   weekendMultiplier: number;
 }
 
-export const HotelFormPage: React.FC = () => {
+export const PropertyFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -338,4 +338,4 @@ export const HotelFormPage: React.FC = () => {
   );
 };
 
-export default HotelFormPage;
+export default PropertyFormPage;

@@ -185,6 +185,10 @@ export const HotelsPage: React.FC = () => {
     }
   };
 
+  const handleEdit = (id: string) => {
+    navigate(`/hotels/${id}/edit`);
+  };
+
   // Show loading state while auth is being checked
   if (authLoading) {
     return (
@@ -264,7 +268,7 @@ export const HotelsPage: React.FC = () => {
             <PropertyCard
               key={hotel.id}
               property={hotel}
-              onEdit={(id) => navigate(`/hotels/edit/${id}`)}
+              onEdit={handleEdit}
               onDelete={handleDelete}
             />
           ))}
