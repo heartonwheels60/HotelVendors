@@ -9,12 +9,12 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   serverTimestamp,
   DocumentData,
   Timestamp
 } from 'firebase/firestore';
 import type { Staff, StaffFormData } from '../types/staff';
+import { auth } from '../config/firebase';
 
 const STAFF_COLLECTION = 'staff';
 
@@ -30,6 +30,7 @@ const convertTimestamp = (timestamp: any): Date => {
 const convertStaffData = (docData: DocumentData, id: string): Staff => {
   return {
     id,
+    ownerId: docData.ownerId,
     firstName: docData.firstName,
     lastName: docData.lastName,
     email: docData.email,
@@ -54,12 +55,22 @@ const convertStaffData = (docData: DocumentData, id: string): Staff => {
 export const staffService = {
   async getStaffMembers(): Promise<Staff[]> {
     try {
-      const q = query(collection(db, STAFF_COLLECTION), orderBy('lastName'));
+      const { currentUser } = auth;
+      if (!currentUser) {
+        throw new Error('No authenticated user');
+      }
+
+      // First get all documents where ownerId matches
+      const q = query(
+        collection(db, STAFF_COLLECTION),
+        where('ownerId', '==', currentUser.uid)
+      );
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map(doc => 
-        convertStaffData(doc.data(), doc.id)
-      );
+      // Then sort the results in memory
+      return querySnapshot.docs
+        .map(doc => convertStaffData(doc.data(), doc.id))
+        .sort((a, b) => a.lastName.localeCompare(b.lastName));
     } catch (error) {
       console.error('Error getting staff members:', error);
       throw new Error('Failed to load staff members');
@@ -68,16 +79,22 @@ export const staffService = {
 
   async getStaffByPropertyId(propertyId: string): Promise<Staff[]> {
     try {
+      const { currentUser } = auth;
+      if (!currentUser) {
+        throw new Error('No authenticated user');
+      }
+
       const q = query(
         collection(db, STAFF_COLLECTION),
-        where('propertyId', '==', propertyId),
-        orderBy('lastName')
+        where('ownerId', '==', currentUser.uid),
+        where('propertyId', '==', propertyId)
       );
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map(doc => 
-        convertStaffData(doc.data(), doc.id)
-      );
+      // Sort in memory instead of using orderBy
+      return querySnapshot.docs
+        .map(doc => convertStaffData(doc.data(), doc.id))
+        .sort((a, b) => a.lastName.localeCompare(b.lastName));
     } catch (error) {
       console.error('Error getting staff members:', error);
       throw new Error('Failed to load staff members');
@@ -102,14 +119,31 @@ export const staffService = {
 
   async createStaffMember(data: StaffFormData): Promise<Staff> {
     try {
+      const { currentUser } = auth;
+      if (!currentUser) {
+        throw new Error('No authenticated user');
+      }
+
+      // Ensure all required fields are present
+      const requiredFields = ['firstName', 'lastName', 'email', 'phone', 'role', 'propertyId', 'propertyName', 'startDate', 'status'];
+      const missingFields = requiredFields.filter(field => !data[field as keyof StaffFormData]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+
       const staffData = {
         ...data,
+        ownerId: currentUser.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
+      // Add the document to Firestore
       const docRef = await addDoc(collection(db, STAFF_COLLECTION), staffData);
-      
+      console.log('Staff member created with ID:', docRef.id);
+
+      // Return the created staff member
       return {
         id: docRef.id,
         ...staffData,
@@ -118,6 +152,9 @@ export const staffService = {
       } as Staff;
     } catch (error) {
       console.error('Error creating staff member:', error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to create staff member: ${error.message}`);
+      }
       throw new Error('Failed to create staff member');
     }
   },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Edit, Trash2, AlertCircle, Building2 } from 'lucide-react';
 import { propertyService } from '../services/propertyService';
 import { useAuth } from '../contexts/AuthContext';
@@ -110,12 +110,6 @@ const PropertyCard = React.memo(({
 
         {/* Actions */}
         <div className="mt-6 flex justify-end space-x-3">
-          <Link
-            to={`/pricing/${property.id}`}
-            className="inline-flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 rounded-md"
-          >
-            Manage All Prices
-          </Link>
           <button
             onClick={() => onEdit(property.id)}
             className="inline-flex items-center text-blue-600 hover:text-blue-700"

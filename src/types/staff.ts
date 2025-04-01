@@ -2,6 +2,7 @@ export type StaffRole = 'manager' | 'receptionist' | 'housekeeper' | 'maintenanc
 
 export interface Staff {
   id: string;
+  ownerId: string;  // ID of the user who created/owns this staff member
   firstName: string;
   lastName: string;
   email: string;
@@ -37,6 +38,7 @@ export interface Staff {
 }
 
 export interface StaffFormData {
+  ownerId: string;  // ID of the user who created/owns this staff member
   firstName: string;
   lastName: string;
   email: string;
