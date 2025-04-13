@@ -44,3 +44,6 @@ export const AmenityCategory: React.FC<AmenityCategoryProps> = ({
     </div>
   );
 };
+
+
+//test
